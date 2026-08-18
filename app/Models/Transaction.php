@@ -8,8 +8,8 @@ class Transaction extends Model
 {
     protected $fillable = [
         'user_id',
-        'flat_id',
-        'flat_user_id',
+        'property_id',
+        'property_user_id',
         'payment_method',
         'stripe_payment_id',
         'amount',
@@ -31,12 +31,12 @@ class Transaction extends Model
     return $this->belongsTo(User::class, 'user_id');
     }
 
-    public function flat(){
-        return $this->belongsTo(Flat::class, 'flat_id');
+    public function property(){
+        return $this->belongsTo(Property::class, 'property_id');
     }
 
     public function booking(){
-        return $this->belongsTo(FlatUser::class, 'flat_user_id');
+        return $this->belongsTo(PropertyUser::class, 'property_user_id');
     }
 
 }

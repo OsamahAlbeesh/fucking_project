@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Flat;
+use App\Models\Property;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Http\Request;
@@ -12,7 +12,7 @@ use Illuminate\Support\Facades\Storage;
 
 class LandlordController extends Controller
 {
-    public function addFlat (Request $request){
+    public function addProperty (Request $request){
 
         $request->validate([
             'price' => 'required_without:rent_price|numeric|min:0',
@@ -20,8 +20,9 @@ class LandlordController extends Controller
             'location' => 'required:string',
             'details'=>'required|string',
             'city_id'=>'required|exists:cities,id',
+            'category'=>'required|in:flat,villa,land,shop,office',
             'governorate_id'=>'required|exists:governorates,id',
-            'flat_image' => 'image|mimes:jpg,jpeg,png|max:2048'
+            'property_image' => 'image|mimes:jpg,jpeg,png|max:2048'
         ]);
 
        $user_id = Auth::user()->id;
@@ -30,43 +31,46 @@ class LandlordController extends Controller
             'message'=>'Your Accout has not yet been Approved'
             ]);
         }
-    $flatPath='';
-       if ($request->hasFile('flat_image'))
-            $flatPath = '/storage/' . $request->file('flat_image')->store('photos','public');
+    $propertyPath='';
+       if ($request->hasFile('property_image'))
+            $propertyPath = '/storage/' . $request->file('property_image')->store('photos','public');
 
 
-        $flat = Flat::create([
+        $property = Property::create([
             'price'=>$request->price,
+            'rent_price'=>$request->rent_price,
             'details'=>$request->details,
             'city_id'=>$request->city_id,
             'governorate_id'=>$request->governorate_id,
-            'flat_image'=>$flatPath,
-            'user_id'=>$user_id
+            'property_image'=>$propertyPath,
+            'user_id'=>$user_id,
+            'location'=>$request->location,
+            'category'=>$request->category
         ]);
 
         return response()->json([
-            'message'=>'Adding Flat Successfully <3',
-            'flat Information'=>$flat
+            'message'=>'Adding Property Successfully <3',
+            'property Information'=>$property
         ], 200);
 
     }
 
 
-      public function updateFlatDetails(Request $request, $id){
+      public function updatePropertyDetails(Request $request, $id){
 
-        $flat = Flat::find($id);
+          $property = Property::find($id);
         if (Auth::user()->verified_status!='approved'){
         return response()->json([
             'message'=>'Your Accout has not yet been Approved'
             ]);
         }
-        if (Auth::user()->id !== $flat->user_id) {
+        if (Auth::user()->id !== $property->user_id) {
         abort(403, 'عذراً، لا تملك الصلاحية لتعديل هذه الشقة.');
         }
-        if (!$flat) {
+        if (!$property) {
             return response()->json([
                 'success' => false,
-                'message' => 'Flat not found'
+                'message' => 'Property not found'
             ], 404);
         }
 
@@ -75,63 +79,69 @@ class LandlordController extends Controller
             'user_id' => 'exists:users,id',
             'governorate_id' => 'nullable|exists:governorates,id',
             'city_id' => 'nullable|exists:cities,id',
+            'location' => 'required:string',
+
             'details' => 'nullable|string|min:10|max:1000',
             'price' => 'nullable|integer|min:10000',
             'rent_price' => 'nullable|integer|min:100',
-            'flat_image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
+            'property_image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
+            'category'=>'nullable|in:flat,villa,land,shop,office',
+
         ]);
 
 
 
-        if ($request->hasFile('flat_image')) {
-            if ($flat->flat_image && Storage::disk('public')->exists($flat->flat_image)) {
-                Storage::disk('public')->delete($flat->flat_image);
+        if ($request->hasFile('property_image')) {
+            if ($property->property_image && Storage::disk('public')->exists($property->property_image)) {
+                Storage::disk('public')->delete($property->property_image);
             }
 
-            $imagePath = $request->file('flat_image')->store('flat_images', 'public');
-            $validated['flat_image'] = $imagePath;
+            $imagePath = $request->file('property_image')->store('property_images', 'public');
+            $validated['property_image'] = $imagePath;
         }
 
-        $flat->user_id =$validated['user_id'] ?? $flat->user_id;
-        $flat->governorate_id =$validated['governorate_id'] ?? $flat->governorate_id;
-        $flat->city_id =$validated['city_id'] ?? $flat->city_id;
-        $flat->details =$validated['details'] ?? $flat->details;
-        $flat->price =$validated['price'] ?? $flat->price;
-        $flat->rent_price =$validated['rent_price'] ?? $flat->rent_price;
-        $flat->flat_image =$validated['flat_image'] ?? $flat->flat_image;
+        $property->user_id =$validated['user_id'] ?? $property->user_id;
+        $property->governorate_id =$validated['governorate_id'] ?? $property->governorate_id;
+        $property->city_id =$validated['city_id'] ?? $property->city_id;
+        $property->details =$validated['details'] ?? $property->details;
+        $property->price =$validated['price'] ?? $property->price;
+        $property->location =$validated['location'] ?? $property->location;
+        $property->rent_price =$validated['rent_price'] ?? $property->rent_price;
+        $property->property_image =$validated['property_image'] ?? $property->property_image;
+        $property->category =$validated['category'] ?? $property->category;
 
-        $flat->save();
+        $property->save();
 
         return response()->json([
             'success' => true,
-            'message' => 'Flat updated successfully <3',
-            'falt information : ' =>$flat
+            'message' => 'Property updated successfully <3',
+            'property information : ' =>$property
         ]);
 }
 
 public function pendingReservations() {
     $landlord = auth()->user();
 
-    $reservations = DB::table('flat_user')
-        ->join('flats', 'flat_user.flat_id', '=', 'flats.id')
-        ->join('users', 'flat_user.user_id', '=', 'users.id')
-        ->where('flats.user_id', $landlord->id)
-        ->where('flat_user.status', 'Pending')
+    $reservations = DB::table('property_user')
+        ->join('properties', 'property_user.property_id', '=', 'properties.id')
+        ->join('users', 'property_user.user_id', '=', 'users.id')
+        ->where('properties.user_id', $landlord->id)
+        ->where('property_user.status', 'Pending')
         ->select(
-            'flat_user.id',
-            'flat_user.user_id as renter_id',
-            'flat_user.start_date',
-            'flat_user.end_date',
+            'property_user.id',
+            'property_user.user_id as renter_id',
+            'property_user.start_date',
+            'property_user.end_date',
             'users.first_name as renter_first_name',
             'users.last_name as renter_last_name',
-            'flats.id as flat_id',
-            'flat_user.type as request_type'
+            'properties.id as property_id',
+            'property_user.type as request_type'
         )
         ->get();
 
     return response()->json([
         'message'=>'Your Reservations Requests',
-        $reservations,
+        'data'=>$reservations,
         'landlord : '=>$landlord
         ]);
 }
@@ -140,7 +150,7 @@ public function pendingReservations() {
 
 public function respondToReservation(Request $request){
     $request->validate([
-        'id' => 'required|exists:flat_user,id',
+        'id' => 'required|exists:property_user,id',
         'status' => 'required|in:Accepted,Rejected',
     ]);
 
@@ -151,11 +161,11 @@ public function respondToReservation(Request $request){
         ], 403);
     }
 
-    $reservation = DB::table('flat_user')
-        ->join('flats', 'flat_user.flat_id', '=', 'flats.id')
-        ->where('flat_user.id', $request->id)
-        ->where('flats.user_id', $landlord->id)
-        ->select('flat_user.*')
+    $reservation = DB::table('property_user')
+        ->join('properties', 'property_user.property_id', '=', 'properties.id')
+        ->where('property_user.id', $request->id)
+        ->where('properties.user_id', $landlord->id)
+        ->select('property_user.*')
         ->first();
 
     if (!$reservation) {
@@ -169,7 +179,7 @@ public function respondToReservation(Request $request){
     //* Accepted
 
     if ($request->status == 'Accepted') {
-        DB::table('flat_user')->where('id', $reservation->id)->update([
+        DB::table('property_user')->where('id', $reservation->id)->update([
             'status' => 'Awaiting_Payment'
         ]);
 
@@ -183,7 +193,7 @@ public function respondToReservation(Request $request){
 
     //* Rejected
 
-    DB::table('flat_user')
+    DB::table('property_user')
         ->where('id', $request->id)
         ->update(['status' => 'Rejected']);
 
@@ -202,22 +212,22 @@ public function getAllReservations()
             'message'=>'Your Accout has not yet been Approved'
             ]);
     }
-    $reservations = DB::table('flat_user')
-        ->join('flats', 'flat_user.flat_id', '=', 'flats.id')
-        ->join('users', 'flat_user.user_id', '=', 'users.id')
-        ->where('flats.user_id', $landlord->id)
+    $reservations = DB::table('property_user')
+        ->join('properties', 'property_user.property_id', '=', 'properties.id')
+        ->join('users', 'property_user.user_id', '=', 'users.id')
+        ->where('properties.user_id', $landlord->id)
         ->select(
-            'flat_user.id as reservation_id',
-            'flat_user.start_date',
-            'flat_user.end_date',
-            'flat_user.status',
+            'property_user.id as reservation_id',
+            'property_user.start_date',
+            'property_user.end_date',
+            'property_user.status',
             'users.first_name as renter_first_name',
             'users.last_name as renter_last_name',
-            'flats.details',
-            'flats.price',
-            'flats.id as flat_id'
+            'properties.details',
+            'properties.price',
+            'properties.id as property_id'
         )
-        ->orderByDesc('flat_user.created_at')
+        ->orderByDesc('property_user.created_at')
         ->get();
 
     return response()->json([

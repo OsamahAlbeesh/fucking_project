@@ -1,14 +1,14 @@
 <?php
 
 use App\Http\Controllers\FavoriteController;
-use App\Http\Controllers\FlatController;
+use App\Http\Controllers\PropertyController;
 use App\Http\Controllers\GovernorateCityController;
 use App\Http\Controllers\LandlordController;
 use App\Http\Controllers\StripeController;
-use App\Http\Controllers\TenantController;
+use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\UserController;
 use App\Http\Middleware\Admin;
-use App\Http\Middleware\Tenant;
+use App\Http\Middleware\Customer;
 use App\Http\Middleware\Landlord;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -33,18 +33,18 @@ Route::post('verifyUser',[UserController::class,'verifyUser'])
 Route::get('/governorates', [GovernorateCityController::class, 'getGovernorates']);
 Route::get('/cities', [GovernorateCityController::class, 'getCities']);
 
-Route::get('/flats', [FlatController::class, 'getAllFlats'])
+Route::get('/properties', [PropertyController::class, 'getAllProperties'])
     ->middleware('auth:sanctum');
-Route::get('/flat/{id}', [FlatController::class, 'getFlatDetails']);
+Route::get('/property/{id}', [PropertyController::class, 'getPropertyDetails'])
+    ->middleware('auth:sanctum');
+Route::post('filter', [PropertyController::class, 'search']);
 
-Route::post('filter', [FlatController::class, 'search']);
 
+Route::post('customer/fav/{property}', [FavoriteController::class, 'toggleFavoriteAlt'])
+    ->middleware('auth:sanctum', Customer::class);
 
-Route::post('tenant/fav/{flat}', [FavoriteController::class, 'toggleFavoriteAlt'])
-    ->middleware('auth:sanctum', Tenant::class);
-
-Route::get('tenant/fav', [FavoriteController::class, 'getMyFavoritesSimple'])
-    ->middleware('auth:sanctum', Tenant::class);
+Route::get('customer/fav', [FavoriteController::class, 'getMyFavoritesSimple'])
+    ->middleware('auth:sanctum', Customer::class);
 
 Route::middleware('auth:sanctum')->get('/me', function (Request $request) {
     return $request->user();
@@ -62,21 +62,21 @@ Route::get('/payment-success-test', function (Illuminate\Http\Request $request) 
 });
 
 Route::middleware(['auth:sanctum', Landlord::class])->group(function () {
-        Route::post('landlord/addflat',[LandlordController::class,'addFlat']);
-        Route::post('landlord/removeflat',[LandlordController::class,'removeFlat']);
-        Route::post('landlord/{flat_id}/updateflat',[LandlordController::class,'updateFlatDetails']);
-        Route::get('landlord/getflats',[LandlordController::class,'getFlats']);
+        Route::post('landlord/addproperty',[LandlordController::class,'addProperty']);
+        Route::post('landlord/removeproperty',[LandlordController::class,'removeProperty']);
+        Route::post('landlord/{property_id}/updateproperty',[LandlordController::class,'updatePropertyDetails']);
+        Route::get('landlord/getproperties',[LandlordController::class,'getProperties']);
         Route::get('landlord/getPendingRents',[LandlordController::class,'pendingReservations']);
         Route::put('landlord/responsToRequsets',[LandlordController::class,'respondToReservation']);
         Route::get('landlord/getAllReservations',[LandlordController::class,'getAllReservations']);
     });
 
-    Route::middleware(['auth:sanctum',Tenant::class])->group(function (){
-        Route::post('tenant/buy',[TenantController::class,'buyFlat'])->middleware('auth:sanctum');
-        Route::post('tenant/rent',[TenantController::class,'reserveFlat'])->middleware('auth:sanctum');
+    Route::middleware(['auth:sanctum',Customer::class])->group(function (){
+        Route::post('customer/buy',[CustomerController::class,'buyProperty'])->middleware('auth:sanctum');
+        Route::post('customer/rent',[CustomerController::class,'reserveProperty'])->middleware('auth:sanctum');
         Route::post('/payment/stripe/checkout', [StripeController::class, 'createCheckoutSession']);
-        Route::put('tenant/rent',[TenantController::class,'updateReservation'])->middleware('auth:sanctum');
-        Route::delete('tenant/rent',[TenantController::class,'cancelReservation'])->middleware('auth:sanctum');
-        Route::post('tenant/rateFlat',[TenantController::class,'rateFlat'])->middleware('auth:sanctum');
-        Route::get('tenant/myReservation',[TenantController::class,'getMyReservation']);
+        Route::put('customer/rent/{property_id}',[CustomerController::class,'updateReservation'])->middleware('auth:sanctum');
+        Route::delete('customer/rent',[CustomerController::class,'cancelReservation'])->middleware('auth:sanctum');
+        Route::post('customer/rateProperty',[CustomerController::class,'rateProperty'])->middleware('auth:sanctum');
+        Route::get('customer/myReservation',[CustomerController::class,'getMyReservation']);
 });

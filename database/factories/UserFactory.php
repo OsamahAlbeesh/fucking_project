@@ -17,10 +17,11 @@ class UserFactory extends Factory
             'last_name' => fake()->lastName(),
             'phone' => '09' . fake()->unique()->numerify('########'),
             'photo_url' => 'storage/photos/random.jpg',
-            'id_photo' => 'storage/photos/random.jpg',
+            'id_photo_front' => 'storage/photos/random.jpg',
+            'id_photo_back' => 'storage/photos/random.jpg',
             'birth_date' => fake()->date('Y-m-d', '2005-01-01'),
             'verified_status' => 'pending',
-            'role' => fake()->randomElement(['tenant', 'landlord']),
+            'role' => fake()->randomElement(['customer', 'landlord']),
             'password' => bcrypt('password'),
             'balance' => rand(10000,1000000),
         ];

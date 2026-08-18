@@ -2,8 +2,8 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Flat;
-use App\Models\FlatUser;
+use App\Models\Property;
+use App\Models\PropertyUser;
 use App\Models\Transaction;
 use App\Models\User;
 use Illuminate\Http\Request;
@@ -22,10 +22,10 @@ class StripeController extends Controller
     {
 
         $request->validate([
-            'flat_user_id' => 'required|exists:flat_user,id',
+            'property_user_id' => 'required|exists:property_user,id',
         ]);
 
-        $booking = FlatUser::with('flat')->findOrFail($request->flat_user_id);
+        $booking = PropertyUser::with('property')->findOrFail($request->property_user_id);
         $user = auth()->user();
 
         if ($booking->status !== 'Awaiting_Payment') {
@@ -40,8 +40,8 @@ class StripeController extends Controller
         }
 
         $rawPrice = $booking->type === 'buy'
-            ? $booking->flat->getRawOriginal('price')
-            : $booking->flat->getRawOriginal('rent_price');
+            ? $booking->property->getRawOriginal('price')
+            : $booking->property->getRawOriginal('rent_price');
 
         if (!$rawPrice) {
             return response()->json(['message' => 'سعر العقار غير محدد في النظام'], 400);
@@ -51,7 +51,7 @@ class StripeController extends Controller
 
         try {
             // 5. منع التكرار: فحص إذا كان هناك معاملة معلقة مسبقاً لنفس هذا الحجز عبر Stripe
-            $transaction = Transaction::where('flat_user_id', $booking->id)
+            $transaction = Transaction::where('property_user_id', $booking->id)
                                       ->where('payment_method', 'stripe')
                                       ->whereIn('status', ['pending', 'Pending'])
                                       ->first();
@@ -65,8 +65,8 @@ class StripeController extends Controller
                     'price_data' => [
                         'currency' => 'usd',
                         'product_data' => [
-                            'name' => 'حجز الشقة رقم: ' . $booking->flat_id,
-                            'description' => $booking->flat->details,
+                            'name' => 'حجز الشقة رقم: ' . $booking->property_id,
+                            'description' => $booking->property->details,
                         ],
                         'unit_amount' => $rawPrice*100, // نمرر السعر الخام كاملاً لـ Stripe بالسنتات مباشرة
                     ],
@@ -77,9 +77,9 @@ class StripeController extends Controller
                 'success_url' => 'http://localhost:3000/payment-success?session_id={CHECKOUT_SESSION_ID}',
                 'cancel_url' => 'http://localhost:3000/payment-failed',
                 'metadata' => [
-                    'flat_user_id' => $booking->id,
+                    'property_user_id' => $booking->id,
                     'user_id' => $user->id,
-                    'flat_id' => $booking->flat_id,
+                    'property_id' => $booking->property_id,
                     'type' => $booking->type,
                 ],
             ]);
@@ -87,8 +87,8 @@ class StripeController extends Controller
             if (!$transaction) {
                 $transaction = Transaction::create([
                     'user_id' => $user->id,
-                    'flat_id' => $booking->flat_id,
-                    'flat_user_id' => $booking->id,
+                    'property_id' => $booking->property_id,
+                    'property_user_id' => $booking->id,
                     'payment_method' => 'stripe',
                     'amount' => $rawPrice / 100, // نقسم على 100 لتعويض الـ Mutator
                     'commission' => ($rawPrice * 0.025), // عمولة المنصة 2.5%
@@ -132,7 +132,7 @@ class StripeController extends Controller
         // إذا تمت عملية الدفع بنجاح في سيرفرات Stripe
         if ($event->type === 'checkout.session.completed') {
             $session = $event->data->object;
-            $flatUserId = $session->metadata->flat_user_id;
+            $propertyUserId = $session->metadata->property_user_id;
 
             DB::beginTransaction();
             try {
@@ -154,16 +154,16 @@ class StripeController extends Controller
                             ])
                         ]);
 
-                        // 2. تحديث حالة الطلب في جدول flat_user
-                        $booking = FlatUser::find($flatUserId);
+                        // 2. تحديث حالة الطلب في جدول property_user
+                        $booking = PropertyUser::find($propertyUserId);
                         if ($booking) {
                             $newStatus = $booking->type === 'buy' ? 'Sold' : 'Accepted';
                             $booking->update(['status' => $newStatus]);
 
                             // 3. إضافة الصافي المالي لحساب المالك (Landlord Balance)
-                            $flat = Flat::find($booking->flat_id);
-                            if ($flat) {
-                                $landlord = User::find($flat->user_id);
+                            $property = Property::find($booking->property_id);
+                            if ($property) {
+                                $landlord = User::find($property->user_id);
                                 if ($landlord) {
                                     // جلب القيم الخام وحساب الصافي للمالك
                                     $rawAmount = $transaction->getRawOriginal('amount');
@@ -176,14 +176,14 @@ class StripeController extends Controller
 
                                 // تحديث حالات الشقق بناءً على نوع العملية
                                 if ($booking->type === 'buy') {
-                                    FlatUser::where('flat_id', $flat->id)
+                                    PropertyUser::where('property_id', $property->id)
                                         ->where('id', '!=', $booking->id)
                                         ->whereIn('status', ['Pending', 'pending'])
                                         ->update(['status' => 'Rejected']);
 
-                                    $flat->update(['status' => 'sold']);
+                                    $property->update(['status' => 'sold']);
                                 } elseif ($booking->type === 'rent') {
-                                    $flat->update(['status' => 'rented']);
+                                    $property->update(['status' => 'rented']);
                                 }
                             }
                         }

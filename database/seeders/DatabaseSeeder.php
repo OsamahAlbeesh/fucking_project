@@ -24,7 +24,7 @@ class DatabaseSeeder extends Seeder
             UserSeeder::class,
             SyrianGovernoratesSeeder::class,
             SyrianCitiesSeeder::class,
-            FlatsSeeder::class
+            PropertiesSeeder::class
         ]);
     }
 }

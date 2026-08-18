@@ -7,10 +7,10 @@ use Illuminate\Support\Facades\Schema;
 return new class extends Migration
 {
     public function up(): void{
-        Schema::create('flat_user', function (Blueprint $table) {
+        Schema::create('property_user', function (Blueprint $table) {
             $table->id();
             $table->foreignId('user_id')->constrained()->onDelete('cascade');
-            $table->foreignId('flat_id')->constrained()->onDelete('cascade');
+            $table->foreignId('property_id')->constrained()->onDelete('cascade');
             $table->enum('type', ['rent', 'buy'])->default('rent');
             $table->date('start_date');
             $table->date('end_date');
@@ -21,6 +21,6 @@ return new class extends Migration
 
     }
     public function down(): void{
-        Schema::dropIfExists('flat_user');
+        Schema::dropIfExists('property_user');
     }
 };

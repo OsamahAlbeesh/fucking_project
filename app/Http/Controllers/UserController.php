@@ -17,8 +17,9 @@ class UserController extends Controller
             'first_name'=>'required|string|max:50',
             'last_name'=>'required|string|max:50',
             'photo_url'=>'required|image|mimes:jpg,png,jpeg|max:4096',
-            'id_photo'=>'required|image|mimes:jpg,png,jpeg|max:4096',
-            'role'=>'required|in:tenant,landlord',
+            'id_photo_front'=>'required|image|mimes:jpg,png,jpeg|max:4096',
+            'id_photo_back'=>'required|image|mimes:jpg,png,jpeg|max:4096',
+            'role'=>'required|in:customer,landlord',
             'birth_date'=>'required|date|before_or_equal:'.now()->subYears(18)->format('Y-m-d'),
             'password'=>'required|min:8|string'
         ],
@@ -38,8 +39,11 @@ class UserController extends Controller
         if ($request->hasFile('photo_url'))
             $personalPath = '/storage/' . $request->file('photo_url')->store('photos','public');
 
-        if ($request->hasFile('photo_url'))
-        $personalIdPath = '/storage/' . $request->file('id_photo')->store('photos','public');
+        if ($request->hasFile('id_photo_front'))
+        $personalIdPathFront = '/storage/' . $request->file('id_photo_front')->store('photos','public');
+
+        if ($request->hasFile('id_photo_back'))
+            $personalIdPathBack = '/storage/' . $request->file('id_photo_back')->store('photos','public');
 
             $user = User::create([
             'phone'=>$request->phone,
@@ -47,8 +51,9 @@ class UserController extends Controller
             'first_name'=>$request->first_name,
             'last_name'=>$request->last_name,
             'photo_url'=>$personalPath,
-            'id_photo'=>$personalIdPath,
-            'role'=>$request->role,
+            'id_photo_front'=>$personalIdPathFront,
+                'id_photo_back'=>$personalIdPathBack,
+                'role'=>$request->role,
             'birth_date'=>$request->birth_date,
         ]);
 

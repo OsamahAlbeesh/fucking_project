@@ -4,11 +4,11 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 
-class Flat extends Model{
+class Property extends Model{
 
     protected $guarded=[];
 
-    protected $table = 'flats';
+    protected $table = 'properties';
 
     public function city(){
         return $this-> belongsTo(City::class);
@@ -27,20 +27,20 @@ class Flat extends Model{
     }
 
     public function renters(){
-        return $this->belongsToMany(User::class, 'flat_user')
+        return $this->belongsToMany(User::class, 'property_user')
               ->withPivot('start_date', 'end_date', 'status', 'rate')
               ->withTimestamps();
     }
     public function reviews(){
-        return $this->hasMany(FlatReview::class);
+        return $this->hasMany(PropertyReview::class);
     }
 
     public function bookings() {
-        return $this->hasMany(FlatUser::class, 'flat_id');
+        return $this->hasMany(PropertyUser::class, 'property_id');
     }
 
     public function transactions() {
-        return $this->hasMany(Transaction::class, 'flat_id');
+        return $this->hasMany(Transaction::class, 'property_id');
     }
 }
 

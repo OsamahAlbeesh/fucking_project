@@ -14,8 +14,8 @@ return new class extends Migration
             Schema::create('transactions', function (Blueprint $table) {
             $table->id();
             $table->foreignId('user_id')->constrained()->onDelete('cascade');
-            $table->foreignId('flat_id')->nullable()->constrained()->onDelete('set null');
-            $table->foreignId('flat_user_id')->nullable()->constrained('flat_user')->onDelete('cascade');
+            $table->foreignId('property_id')->nullable()->constrained()->onDelete('set null');
+            $table->foreignId('property_user_id')->nullable()->constrained('property_user')->onDelete('cascade');
             $table->string('type')->default('payment');
             $table->bigInteger('amount');
             $table->bigInteger('commission')->default(0);

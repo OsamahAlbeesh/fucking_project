@@ -11,15 +11,15 @@ return new class extends Migration
      */
     public function up(): void
     {
-    Schema::create('flat_reviews', function (Blueprint $table) {
+    Schema::create('property_reviews', function (Blueprint $table) {
         $table->id();
-        $table->unsignedBigInteger('flat_id');
+        $table->unsignedBigInteger('property_id');
         $table->unsignedBigInteger('user_id');
         $table->unsignedTinyInteger('rating');
         $table->text('review')->nullable();
         $table->timestamps();
 
-        $table->foreign('flat_id')->references('id')->on('flats')->onDelete('cascade');
+        $table->foreign('property_id')->references('id')->on('properties')->onDelete('cascade');
         $table->foreign('user_id')->references('id')->on('users')->onDelete('cascade');
     });
 
@@ -30,6 +30,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('flat_reviews');
+        Schema::dropIfExists('property_reviews');
     }
 };

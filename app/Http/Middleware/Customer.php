@@ -7,7 +7,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Symfony\Component\HttpFoundation\Response;
 
-class Tenant
+class Customer
 {
     /**
      * Handle an incoming request.
@@ -20,10 +20,10 @@ class Tenant
         $user = Auth::user();
 
         // Check if user has admin role
-        if ($user->role !== 'tenant') {
+        if ($user->role !== 'customer') {
             return response()->json([
                 'success' => false,
-                'message' => 'Access denied. Tenant privileges required.'
+                'message' => 'Access denied. Customer privileges required.'
             ], 403);
         }
         return $next($request);

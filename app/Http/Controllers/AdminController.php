@@ -9,7 +9,7 @@ class AdminController extends Controller
 {
 
     public function dashboard(){
-    $pendingUsers = User::whereIn('role', ['landlord', 'tenant'])
+    $pendingUsers = User::whereIn('role', ['landlord', 'customer'])
                         ->where('verified_status', 'pending')
                         ->get();
 

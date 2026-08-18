@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
-use App\Models\Flat;
+use App\Models\Property;
 
 class User extends Authenticatable
 {
@@ -34,14 +34,14 @@ class User extends Authenticatable
 
 
     public function favorites(){
-        return $this->belongsToMany(Flat::class, 'favorites')
+        return $this->belongsToMany(Property::class, 'favorites')
             ->withTimestamps()
             ->withPivot('id');
     }
 
 
-    public function flats(){
-        return $this->hasMany(Flat::class);
+    public function properties(){
+        return $this->hasMany(Property::class);
     }
 
 
@@ -56,6 +56,6 @@ class User extends Authenticatable
     }
 
     public function bookings(){
-        return $this->hasMany(FlatUser::class);
+        return $this->hasMany(PropertyUser::class);
     }
 }

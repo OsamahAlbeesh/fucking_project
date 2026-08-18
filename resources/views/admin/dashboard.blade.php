@@ -39,7 +39,7 @@
 
                                     <td class="py-4 px-6 text-right">
                                         <span class="px-3 py-2 rounded-full text-sm {{ $user->role == 'landlord' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700' }}">
-                                            {{ $user->role == 'landlord' ? 'صاحب شقة' : 'مستأجر' }}
+                                            {{ $user->role == 'landlord' ? 'صاحب عقار' : 'زبون' }}
                                         </span>
                                     </td>
 

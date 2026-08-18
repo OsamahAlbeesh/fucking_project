@@ -22,7 +22,7 @@ class Landlord
         if ($user->role !== 'landlord') {
             return response()->json([
                 'success' => false,
-                'message' => 'Access denied. Tenant privileges required.'
+                'message' => 'Access denied. Customer privileges required.'
             ], 403);
         }
         return $next($request);

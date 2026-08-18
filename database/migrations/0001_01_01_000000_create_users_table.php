@@ -17,11 +17,12 @@ return new class extends Migration
             $table->string('last_name');
             $table->string('phone')->unique();
             $table->string('photo_url');
-            $table->string('id_photo');
+            $table->string('id_photo_front');
+            $table->string('id_photo_back');
             $table->date('birth_date');
             $table->bigInteger('balance')->default(0);
             $table->enum('verified_status',['pending','approved','rejected'])->default('pending');
-            $table->enum('role',['admin','tenant','landlord']);
+            $table->enum('role',['admin','customer','landlord']);
             $table->string('password');
             $table->string('location')->nullable();
             $table->string('stripe_id')->nullable();
