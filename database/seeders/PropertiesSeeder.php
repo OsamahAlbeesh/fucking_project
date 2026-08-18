@@ -25,28 +25,29 @@ class PropertiesSeeder extends Seeder
                 'price' => 170000,
                 'rate' => 4.7,
                 'property_image' => 'properties/damascus2.jpg',
-                'location' => 'DX123Cdk345AQx'
+                'longitude'=>'120.125',
+                'latitude'=>'125.366'
             ],
             [
                 'user_id' => 2,
-                'governorate_id' => 1,
-                'city_id' => 3,
+                'governorate_id' => 2,
+                'city_id' => 6,
                 'details' => 'شقة في داريا',
                 'price' => 130000,
                 'rate' => 4.1,
                 'property_image' => 'properties/darya1.jpg',
-                'location' => 'DX12fk2l34jx'
-            ],
+                'longitude'=>'120.125',
+                'latitude'=>'125.366'            ],
             [
                 'user_id' => 3,
                 'governorate_id' => 3,
-                'city_id' => 7,
+                'city_id' => 10,
                 'details' => 'شقة في منبج',
                 'price' => 90000,
                 'rate' => 3.9,
                 'property_image' => 'properties/manbij1.jpg',
-                'location' => 'kdf903jcn82kzio'
-            ],
+                'longitude'=>'120.125',
+                'latitude'=>'125.366'            ],
         ];
 
         // استخدام foreach مع create عبر Model

@@ -18,6 +18,7 @@ class LandlordController extends Controller
             'price' => 'required_without:rent_price|numeric|min:0',
             'rent_price' => 'required_without:price|numeric|min:0',
             'location' => 'required:string',
+
             'details'=>'required|string',
             'city_id'=>'required|exists:cities,id',
             'category'=>'required|in:flat,villa,land,shop,office',
@@ -234,6 +235,83 @@ public function getAllReservations()
         'here all your Reservations : '=>$reservations
     ]);
 }
+    public function getProperties()
+    {
+        $landlord = auth()->user();
 
+        if ($landlord->verified_status !== 'approved') {
+            return response()->json([
+                'message' => 'Your account has not yet been approved.',
+            ], 403);
+        }
+
+        $properties = Property::query()
+            ->where('user_id', $landlord->id)
+            ->with([
+                'city:id,name',
+                'governorate:id,name',
+            ])
+            ->withCount(['bookings', 'reviews'])
+            ->latest()
+            ->get();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Your properties were retrieved successfully.',
+            'data' => $properties,
+        ], 200);
+    }
+
+
+    public function removeProperty(Request $request)
+    {
+        $validated = $request->validate([
+            'property_id' => ['required', 'integer', 'exists:properties,id'],
+        ]);
+
+        $landlord = auth()->user();
+
+        if ($landlord->verified_status !== 'approved') {
+            return response()->json([
+                'message' => 'Your account has not yet been approved.',
+            ], 403);
+        }
+
+        $property = Property::query()
+            ->whereKey($validated['property_id'])
+            ->where('user_id', $landlord->id)
+            ->first();
+
+        if (!$property) {
+            return response()->json([
+                'message' => 'Property not found or you do not own it.',
+            ], 404);
+        }
+
+        $hasActiveBookings = $property->bookings()
+            ->whereIn('status', ['Pending', 'Accepted', 'Awaiting_Payment'])
+            ->exists();
+
+        if ($hasActiveBookings) {
+            return response()->json([
+                'message' => 'This property cannot be deleted while it has active reservations.',
+            ], 409);
+        }
+
+        if ($property->property_image) {
+            $imagePath = preg_replace('#^/storage/#', '', $property->property_image);
+
+            if (Storage::disk('public')->exists($imagePath)) {
+                Storage::disk('public')->delete($imagePath);
+            }
+        }
+
+        $property->delete();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Property deleted successfully.',
+        ], 200);
+    }
 
 }

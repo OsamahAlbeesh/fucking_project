@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\FavoriteController;
+use App\Http\Controllers\AdminController;
 use App\Http\Controllers\PropertyController;
 use App\Http\Controllers\GovernorateCityController;
 use App\Http\Controllers\LandlordController;
@@ -26,8 +27,9 @@ Route::post('/stripe/webhook', [StripeController::class, 'handleWebhook']);
 Route::get('getUsers',[UserController::class,'getUsers'])
     ->middleware('auth:sanctum', Admin::class);
 
-Route::post('verifyUser',[UserController::class,'verifyUser'])
-    ->middleware('auth:sanctum', Admin::class);
+Route::post('verifyUser', [AdminController::class, 'verifyUser'])
+    ->middleware('auth:sanctum', Admin::class)
+    ->name('admin.verifyUser');
 // #################################################################################
 
 Route::get('/governorates', [GovernorateCityController::class, 'getGovernorates']);
@@ -51,19 +53,10 @@ Route::middleware('auth:sanctum')->get('/me', function (Request $request) {
 });
 
 
-// للمؤجر فقط
-
-Route::get('/payment-success-test', function (Illuminate\Http\Request $request) {
-    return response()->json([
-        'success' => true,
-        'message' => 'Stripe redirected you here successfully!',
-        'session_id' => $request->query('session_id')
-    ]);
-});
 
 Route::middleware(['auth:sanctum', Landlord::class])->group(function () {
         Route::post('landlord/addproperty',[LandlordController::class,'addProperty']);
-        Route::post('landlord/removeproperty',[LandlordController::class,'removeProperty']);
+        Route::delete('landlord/removeproperty',[LandlordController::class,'removeProperty']);
         Route::post('landlord/{property_id}/updateproperty',[LandlordController::class,'updatePropertyDetails']);
         Route::get('landlord/getproperties',[LandlordController::class,'getProperties']);
         Route::get('landlord/getPendingRents',[LandlordController::class,'pendingReservations']);
