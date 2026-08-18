@@ -5,18 +5,18 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 
 class DemoPaymentController extends Controller
 {
     /**
-     * يحاكي دفع عربون الحجز من محفظة العميل إلى محفظة المالك.
-     * لا يستقبل المبلغ من العميل؛ فهو يحسب على الخادم بنسبة 5% من السعر.
+     * يتمم العميل وثيقة عربون مولدة تلقائياً عند موافقة المالك.
+     * لا يستقبل المبلغ أو الرقم المرجعي من العميل.
      */
     public function payReservationDeposit(Request $request)
     {
         $validated = $request->validate([
             'property_user_id' => ['required', 'integer', 'exists:property_user,id'],
-            'reference_number' => ['required', 'string', 'min:8', 'max:30', 'regex:/^[A-Za-z0-9-]+$/'],
         ]);
 
         $customer = auth()->user();
@@ -36,78 +36,47 @@ class DemoPaymentController extends Controller
                     ->first();
 
                 if (!$booking || (int) $booking->user_id !== (int) $customer->id) {
-                    return response()->json([
-                        'success' => false,
-                        'message' => 'غير مصرح لك بالدفع لهذا الطلب.',
-                    ], 403);
+                    return response()->json(['success' => false, 'message' => 'غير مصرح لك بالدفع لهذا الطلب.'], 403);
                 }
 
                 if ($booking->status !== 'Awaiting_Payment') {
-                    return response()->json([
-                        'success' => false,
-                        'message' => 'هذا الحجز ليس بانتظار دفع العربون.',
-                    ], 409);
+                    return response()->json(['success' => false, 'message' => 'هذا الحجز ليس بانتظار دفع العربون.'], 409);
                 }
 
-                $property = DB::table('properties')
-                    ->where('id', $booking->property_id)
-                    ->lockForUpdate()
-                    ->first();
-
+                $property = DB::table('properties')->where('id', $booking->property_id)->lockForUpdate()->first();
                 if (!$property || (int) $property->user_id === (int) $customer->id) {
-                    return response()->json([
-                        'success' => false,
-                        'message' => 'لا يمكن دفع عربون لعقار تملكه أنت.',
-                    ], 403);
+                    return response()->json(['success' => false, 'message' => 'لا يمكن دفع عربون لعقار تملكه أنت.'], 403);
                 }
 
                 if ($property->status !== 'available') {
-                    return response()->json([
-                        'success' => false,
-                        'message' => 'هذا العقار لم يعد متاحاً للحجز.',
-                    ], 409);
+                    return response()->json(['success' => false, 'message' => 'هذا العقار لم يعد متاحاً للحجز.'], 409);
                 }
 
-                $price = $booking->type === 'buy' ? $property->price : $property->rent_price;
-
-                if (!is_numeric($price) || (int) $price <= 0) {
-                    return response()->json([
-                        'success' => false,
-                        'message' => 'سعر العقار غير محدد بشكل صالح في النظام.',
-                    ], 422);
-                }
-
-                // جميع القيم أعداد صحيحة في أصغر وحدة يعتمدها المشروع.
-                $depositAmount = max(1, intdiv((int) $price, 20));
-
-                if (DB::table('transactions')->where('reference_number', $validated['reference_number'])->exists()) {
-                    return response()->json([
-                        'success' => false,
-                        'message' => 'رقم المرجع مستخدم مسبقاً. يرجى توليد رقم جديد.',
-                    ], 409);
-                }
-
-                $alreadyPaid = DB::table('transactions')
+                $transaction = DB::table('transactions')
                     ->where('property_user_id', $booking->id)
+                    ->where('user_id', $customer->id)
                     ->where('payment_method', 'demo')
-                    ->where('demo_status', 'paid_simulated')
-                    ->exists();
+                    ->where('demo_status', 'pending')
+                    ->lockForUpdate()
+                    ->first();
 
-                if ($alreadyPaid) {
+                if (!$transaction) {
                     return response()->json([
                         'success' => false,
-                        'message' => 'تم دفع عربون هذا الحجز مسبقاً.',
+                        'message' => 'لا توجد وثيقة دفع معلقة لهذا الحجز. راجع المالك أو الإدارة.',
                     ], 409);
+                }
+
+                $depositAmount = (int) $transaction->amount;
+                if ($depositAmount <= 0 || !$transaction->reference_number) {
+                    return response()->json(['success' => false, 'message' => 'وثيقة الدفع المعلقة غير صالحة.'], 422);
                 }
 
                 $lockedCustomer = DB::table('users')->where('id', $customer->id)->lockForUpdate()->first();
                 $landlord = DB::table('users')->where('id', $property->user_id)->lockForUpdate()->first();
 
                 if (!$landlord || $landlord->role !== 'landlord') {
-                    return response()->json([
-                        'success' => false,
-                        'message' => 'مالك العقار غير صالح لاستلام العربون.',
-                    ], 422);
+                    return response()->json(['success' => false, 'message' => 'مالك العقار غير صالح لاستلام العربون.'], 422);
                 }
 
                 if ((int) $lockedCustomer->balance < $depositAmount) {
@@ -117,57 +86,39 @@ class DemoPaymentController extends Controller
                         'data' => [
                             'required_deposit' => $depositAmount,
                             'current_balance' => (int) $lockedCustomer->balance,
+                            'reference_number' => $transaction->reference_number,
                         ],
                     ], 422);
                 }
 
                 $now = now();
-                $transactionId = DB::table('transactions')->insertGetId([
-                    'user_id' => $customer->id,
-                    'property_id' => $property->id,
-                    'property_user_id' => $booking->id,
-                    'type' => 'reservation_deposit',
-                    'amount' => $depositAmount,
-                    'commission' => 0,
-                    'payment_method' => 'demo',
-                    'reference_number' => $validated['reference_number'],
+                DB::table('transactions')->where('id', $transaction->id)->update([
                     'demo_status' => 'paid_simulated',
-                    // يبقى الحقل القديم متوافقاً مع بنية المشروع.
                     'status' => 'completed',
                     'paid_at' => $now,
-                    'payment_details' => json_encode([
-                        'provider' => 'demo',
-                        'payment_type' => 'reservation_deposit',
-                        'currency' => 'project_balance_unit',
-                        'note' => 'Simulated internal wallet transfer only',
-                    ], JSON_UNESCAPED_UNICODE),
-                    'created_at' => $now,
                     'updated_at' => $now,
                 ]);
-
                 DB::table('users')->where('id', $customer->id)->decrement('balance', $depositAmount);
                 DB::table('users')->where('id', $landlord->id)->increment('balance', $depositAmount);
-
-                // Accepted هنا تعني أن العربون حُجز بنجاح ضمن الحالات الموجودة سابقاً.
                 DB::table('property_user')->where('id', $booking->id)->update([
                     'status' => 'Accepted',
                     'updated_at' => $now,
                 ]);
 
                 $this->recordReservationEvent($booking->id, $customer->id, 'demo_deposit_paid', 'Awaiting_Payment', 'Accepted', [
-                    'transaction_id' => $transactionId,
+                    'transaction_id' => $transaction->id,
                     'amount' => $depositAmount,
-                    'reference_number' => $validated['reference_number'],
+                    'reference_number' => $transaction->reference_number,
                 ]);
 
                 return response()->json([
                     'success' => true,
                     'message' => 'تمت محاكاة دفع عربون الحجز ونقل الرصيد إلى المالك بنجاح.',
                     'data' => [
-                        'transaction_id' => $transactionId,
+                        'transaction_id' => $transaction->id,
                         'property_user_id' => $booking->id,
                         'amount' => $depositAmount,
-                        'reference_number' => $validated['reference_number'],
+                        'reference_number' => $transaction->reference_number,
                         'payment_status' => 'paid_simulated',
                         'reservation_status' => 'Accepted',
                     ],
@@ -181,6 +132,100 @@ class DemoPaymentController extends Controller
                 'message' => 'تعذر تنفيذ محاكاة الدفع حالياً.',
             ], 500);
         }
+    }
+
+    /**
+     * يعرض وثيقة الدفعة للعميل. ولتوافق الحجوزات التي قُبلت قبل الإصلاح،
+     * ينشئ الوثيقة الناقصة مرة واحدة عندما تكون الحالة Awaiting_Payment.
+     */
+    public function getPaymentDocument(Request $request, $bookingId)
+    {
+        $customer = auth()->user();
+
+        return DB::transaction(function () use ($bookingId, $customer) {
+            $booking = DB::table('property_user')
+                ->where('id', $bookingId)
+                ->where('user_id', $customer->id)
+                ->lockForUpdate()
+                ->first();
+
+            if (!$booking) {
+                return response()->json(['success' => false, 'message' => 'الحجز غير موجود أو لا يخصك.'], 404);
+            }
+
+            $payment = DB::table('transactions')
+                ->where('property_user_id', $booking->id)
+                ->where('user_id', $customer->id)
+                ->where('payment_method', 'demo')
+                ->latest('id')
+                ->lockForUpdate()
+                ->first();
+
+            if (!$payment && $booking->status === 'Awaiting_Payment') {
+                $property = DB::table('properties')->where('id', $booking->property_id)->first();
+                $price = $property && $booking->type === 'buy' ? $property->price : ($property->rent_price ?? null);
+
+                if (!is_numeric($price) || (int) $price <= 0) {
+                    return response()->json(['success' => false, 'message' => 'لا يمكن إنشاء الوثيقة لأن سعر العقار غير صالح.'], 422);
+                }
+
+                $now = now();
+                $paymentId = DB::table('transactions')->insertGetId([
+                    'user_id' => $customer->id,
+                    'property_id' => $booking->property_id,
+                    'property_user_id' => $booking->id,
+                    'type' => 'reservation_deposit',
+                    'amount' => max(1, intdiv((int) $price, 20)),
+                    'commission' => 0,
+                    'payment_method' => 'demo',
+                    'reference_number' => $this->generateDemoReferenceNumber(),
+                    'status' => 'pending',
+                    'demo_status' => 'pending',
+                    'payment_details' => json_encode([
+                        'provider' => 'demo',
+                        'payment_type' => 'reservation_deposit',
+                        'note' => 'Backfilled for a reservation awaiting payment before document creation was added',
+                    ], JSON_UNESCAPED_UNICODE),
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ]);
+                $payment = DB::table('transactions')->where('id', $paymentId)->first();
+                $this->recordReservationEvent($booking->id, null, 'payment_document_backfilled', 'Awaiting_Payment', 'Awaiting_Payment', [
+                    'transaction_id' => $paymentId,
+                ]);
+            }
+
+            if (!$payment) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'لا توجد وثيقة دفع لهذا الحجز؛ لا يمكن إنشاؤها قبل موافقة المالك.',
+                ], 404);
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => 'تم جلب وثيقة الدفع التجريبية.',
+                'data' => [
+                    'transaction_id' => $payment->id,
+                    'property_user_id' => (int) $payment->property_user_id,
+                    'amount' => (int) $payment->amount,
+                    'reference_number' => $payment->reference_number,
+                    'payment_method' => $payment->payment_method,
+                    'status' => $payment->status,
+                    'demo_status' => $payment->demo_status,
+                    'created_at' => $payment->created_at,
+                ],
+            ], 200);
+        });
+    }
+
+    private function generateDemoReferenceNumber(): string
+    {
+        do {
+            $referenceNumber = 'DEMO-'.strtoupper(Str::random(16));
+        } while (DB::table('transactions')->where('reference_number', $referenceNumber)->exists());
+
+        return $referenceNumber;
     }
 
     /** يطلب العميل استرداداً؛ لا يُعاد الرصيد تلقائياً. */

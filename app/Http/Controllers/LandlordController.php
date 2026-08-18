@@ -9,6 +9,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB as FacadesDB;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 class LandlordController extends Controller
 {
@@ -158,50 +159,126 @@ public function respondToReservation(Request $request){
     $landlord = auth()->user();
     if ($landlord->verified_status != 'approved'){
         return response()->json([
+            'success' => false,
             'message' => 'Your Account has not yet been Approved'
         ], 403);
     }
 
-    $reservation = DB::table('property_user')
-        ->join('properties', 'property_user.property_id', '=', 'properties.id')
-        ->where('property_user.id', $request->id)
-        ->where('properties.user_id', $landlord->id)
-        ->select('property_user.*')
-        ->first();
+    return DB::transaction(function () use ($request, $landlord) {
+        $reservation = DB::table('property_user')
+            ->where('id', $request->id)
+            ->lockForUpdate()
+            ->first();
+        $property = $reservation
+            ? DB::table('properties')->where('id', $reservation->property_id)->lockForUpdate()->first()
+            : null;
 
-    if (!$reservation) {
-        return response()->json(['message' => 'هذا الحجز غير موجود أو لا يخصك'], 403);
-    }
+        if (!$reservation || !$property || (int) $property->user_id !== (int) $landlord->id) {
+            return response()->json(['success' => false, 'message' => 'هذا الحجز غير موجود أو لا يخصك'], 403);
+        }
 
-    if ($reservation->status !== 'Pending') {
-        return response()->json(['message' => 'تم معالجة هذا الطلب مسبقاً، لا يمكن تعديله الآن'], 400);
-    }
+        if ($reservation->status !== 'Pending') {
+            return response()->json(['success' => false, 'message' => 'تمت معالجة هذا الطلب مسبقاً، لا يمكن تعديله الآن'], 409);
+        }
 
-    //* Accepted
+        $now = now();
 
-    if ($request->status == 'Accepted') {
+        if ($request->status === 'Accepted') {
+            $price = $reservation->type === 'buy' ? $property->price : $property->rent_price;
+
+            if (!is_numeric($price) || (int) $price <= 0) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'لا يمكن قبول الحجز لأن سعر العقار غير محدد بشكل صالح.',
+                ], 422);
+            }
+
+            // ينشأ المستند قبل الدفع حتى يرى العميل رقمه المرجعي ومقداره.
+            $depositAmount = max(1, intdiv((int) $price, 20));
+            $referenceNumber = $this->generateDemoReferenceNumber();
+            $transactionId = DB::table('transactions')->insertGetId([
+                'user_id' => $reservation->user_id,
+                'property_id' => $property->id,
+                'property_user_id' => $reservation->id,
+                'type' => 'reservation_deposit',
+                'amount' => $depositAmount,
+                'commission' => 0,
+                'payment_method' => 'demo',
+                'reference_number' => $referenceNumber,
+                'status' => 'pending',
+                'demo_status' => 'pending',
+                'payment_details' => json_encode([
+                    'provider' => 'demo',
+                    'payment_type' => 'reservation_deposit',
+                    'currency' => 'project_balance_unit',
+                    'note' => 'Created automatically when landlord approved the reservation',
+                ], JSON_UNESCAPED_UNICODE),
+                'created_at' => $now,
+                'updated_at' => $now,
+            ]);
+
+            DB::table('property_user')->where('id', $reservation->id)->update([
+                'status' => 'Awaiting_Payment',
+                'updated_at' => $now,
+            ]);
+            DB::table('reservation_events')->insert([
+                'property_user_id' => $reservation->id,
+                'actor_id' => $landlord->id,
+                'event_type' => 'reservation_approved_payment_created',
+                'from_status' => 'Pending',
+                'to_status' => 'Awaiting_Payment',
+                'metadata' => json_encode([
+                    'transaction_id' => $transactionId,
+                    'reference_number' => $referenceNumber,
+                    'amount' => $depositAmount,
+                ], JSON_UNESCAPED_UNICODE),
+                'created_at' => $now,
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'تم قبول الطلب وإنشاء وثيقة دفع تجريبية بانتظار العميل.',
+                'data' => [
+                    'property_user_id' => $reservation->id,
+                    'reservation_status' => 'Awaiting_Payment',
+                    'payment' => [
+                        'transaction_id' => $transactionId,
+                        'reference_number' => $referenceNumber,
+                        'amount' => $depositAmount,
+                        'payment_method' => 'demo',
+                        'demo_status' => 'pending',
+                    ],
+                ],
+            ], 200);
+        }
+
         DB::table('property_user')->where('id', $reservation->id)->update([
-            'status' => 'Awaiting_Payment'
+            'status' => 'Rejected',
+            'updated_at' => $now,
         ]);
-
-    //! Notification Require
+        DB::table('reservation_events')->insert([
+            'property_user_id' => $reservation->id,
+            'actor_id' => $landlord->id,
+            'event_type' => 'reservation_rejected_by_landlord',
+            'from_status' => 'Pending',
+            'to_status' => 'Rejected',
+            'created_at' => $now,
+        ]);
 
         return response()->json([
             'success' => true,
-            'message' => 'تم قبول الطلب بنجاح، وتحويل حالته إلى (بانتظار الدفع)، وتم إشعار الزبون لإتمام العملية.'
+            'message' => 'تم رفض طلب الحجز بنجاح.'
         ], 200);
-    }
+    });
+}
 
-    //* Rejected
+private function generateDemoReferenceNumber(): string
+{
+    do {
+        $referenceNumber = 'DEMO-'.strtoupper(Str::random(16));
+    } while (DB::table('transactions')->where('reference_number', $referenceNumber)->exists());
 
-    DB::table('property_user')
-        ->where('id', $request->id)
-        ->update(['status' => 'Rejected']);
-
-    return response()->json([
-        'success' => true,
-        'message' => 'تم رفض طلب الحجز بنجاح.'
-    ], 200);
+    return $referenceNumber;
 }
 
 

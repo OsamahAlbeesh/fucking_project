@@ -73,6 +73,7 @@ Route::middleware(['auth:sanctum', Landlord::class])->group(function () {
         Route::post('customer/buy',[CustomerController::class,'buyProperty'])->middleware('auth:sanctum');
         Route::post('customer/rent',[CustomerController::class,'reserveProperty'])->middleware('auth:sanctum');
         // المبلغ يُحسب في الخادم ويُنقل من رصيد العميل إلى رصيد المالك بمحاكاة demo.
+        Route::get('customer/reservations/{bookingId}/payment', [DemoPaymentController::class, 'getPaymentDocument']);
         Route::post('customer/payment/demo', [DemoPaymentController::class, 'payReservationDeposit']);
         Route::post('customer/payments/{transactionId}/request-refund', [DemoPaymentController::class, 'requestRefund']);
         Route::post('customer/reservations/{bookingId}/dispute', [DemoPaymentController::class, 'openDispute']);
