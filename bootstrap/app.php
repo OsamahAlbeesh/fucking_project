@@ -12,9 +12,7 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        $middleware->validateCsrfTokens(except: [
-        'api/stripe/webhook',
-    ]);
+        // لا توجد استثناءات لبوابات دفع خارجية في وضع الدفع التجريبي.
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //
