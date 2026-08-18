@@ -139,7 +139,8 @@ class CustomerController extends Controller
     return response()->json([
         'success' => true,
         'message' => 'تم تسجيل طلب الحجز بنجاح، يرجى الانتقال لتوليد رابط الدفع لإتمام المعاملة المالية',
-        'property_user_id' => $booking->id // هذا المعرّف مهم جداً للفرونت إند ليستدعي به الـ Stripe Controller
+        'property_user_id' => $booking->id ,// هذا المعرّف مهم جداً للفرونت إند ليستدعي به الـ Stripe Controller
+        'user'=>$user
     ], 201);
 }
 
@@ -196,84 +197,112 @@ class CustomerController extends Controller
     ], 201);
 }
 
-    public function updateReservation(Request $request ,$property_id) {
-    $request->validate([
-        'start_date' => 'required|date',
-        'end_date' => 'required|date|after:start_date',
-    ]);
+    public function updateReservation(Request $request, $property_id)
+    {
+        $request->validate([
+            'start_date' => 'required|date',
+            'end_date' => 'required|date|after:start_date',
+        ]);
 
-    $user = auth()->user();
-    if ($user->verified_status!='approved'){
+        $user = auth()->user();
+
+        if ($user->verified_status != 'approved') {
+            return response()->json([
+                'message' => 'Your Account has not yet been Approved'
+            ], 403);
+        }
+
+        $existing = DB::table('property_user')
+            ->where('user_id', $user->id)
+            ->where('property_id', $property_id)
+            ->first();
+
+        if (!$existing) {
+            return response()->json([
+                'message' => 'لا يوجد حجز سابق لهذه الشقة'
+            ], 404);
+        }
+
+        $conflict = DB::table('property_user')
+            ->where('property_id', $property_id)
+            ->where('user_id', '!=', $user->id)
+            ->where(function ($query) use ($request) {
+                $query->whereBetween('start_date', [
+                    $request->start_date,
+                    $request->end_date
+                ])
+                    ->orWhereBetween('end_date', [
+                        $request->start_date,
+                        $request->end_date
+                    ])
+                    ->orWhere(function ($q) use ($request) {
+                        $q->where('start_date', '<=', $request->start_date)
+                            ->where('end_date', '>=', $request->end_date);
+                    });
+            })
+            ->where('status', 'Accepted')
+            ->exists();
+
+        if ($conflict) {
+            return response()->json([
+                'message' => 'الشقة محجوزة في هذه الفترة'
+            ], 409);
+        }
+
+        // ✅ هنا التعديل
+        $booking = PropertyUser::where('user_id', $user->id)
+            ->where('property_id', $property_id)
+            ->first();
+
+        if (!$booking) {
+            return response()->json([
+                'message' => 'لا يوجد حجز سابق لهذه الشقة'
+            ], 404);
+        }
+
+        $booking->update([
+            'start_date' => $request->start_date,
+            'end_date' => $request->end_date,
+            'status' => 'Pending',
+        ]);
+
         return response()->json([
-            'message'=>'Your Account has not yet been Approved'
-            ],403);
-    }
-    $existing = DB::table('property_user')
-        ->where('user_id', $user->id)
-        ->where('property_id',$property_id)
-        ->first();
-
-    if (!$existing) {
-        return response()->json(['message' => 'لا يوجد حجز سابق لهذه الشقة'], 404);
+            'message' => 'تم تعديل الحجز بنجاح بانتظار موافقة صاحب الشقة على التعديل ...'
+        ], 200);
     }
 
-    $conflict = DB::table('property_user')
-        ->where('property_id', $property_id)
-        ->where('user_id', '!=', $user->id)
-        ->where(function ($query) use ($request) {
-            $query->whereBetween('start_date', [$request->start_date, $request->end_date])
-                  ->orWhereBetween('end_date', [$request->start_date, $request->end_date])
-                  ->orWhere(function ($q) use ($request) {
-                      $q->where('start_date', '<=', $request->start_date)
-                        ->where('end_date', '>=', $request->end_date);
-                  });
-        })
-        ->where('status', 'Accepted')
-        ->exists();
+    public function cancelReservation(Request $request)
+    {
+        $request->validate([
+            'property_user_id' => 'required|exists:property_user,id',
+        ]);
 
-    if ($conflict) {
-        return response()->json(['message' => 'الشقة محجوزة في هذه الفترة'], 409);
-    }
+        $user = auth()->user();
 
-    $user->bookings()->updateExistingPivot($property_id, [
-        'start_date' => $request->start_date,
-        'end_date' => $request->end_date,
-        'status' => 'Pending',
-    ]);
+        if ($user->verified_status != 'approved') {
+            return response()->json([
+                'message' => 'Your Account has not yet been Approved'
+            ], 403);
+        }
 
-    return response()->json([
-        'message' => 'تم تعديل الحجز بنجاح بانتظار موافقة صاحب الشقة على التعديل ...'
-    ], 200);
-}
+        // البحث عن الحجز الخاص بهذا المستخدم
+        $existing = PropertyUser::where('id', $request->property_user_id)
+            ->where('user_id', $user->id)
+            ->first();
 
-public function cancelReservation(Request $request)
-{
-    $request->validate([
-        'property_id' => 'required|exists:properties,id',
-    ]);
+        if (!$existing) {
+            return response()->json([
+                'message' => 'لا يوجد هذا الحجز للمستخدم الحالي'
+            ], 404);
+        }
 
-    $user = auth()->user();
-    if ($user->verified_status!='approved'){
+        // حذف الحجز
+        $existing->delete();
+
         return response()->json([
-            'message'=>'Your Accout has not yet been Approved'
-            ],403);
+            'message' => 'تم إلغاء الحجز بنجاح'
+        ], 200);
     }
-    $existing = DB::table('property_user')
-        ->where('user_id', $user->id)
-        ->where('property_id', $request->property_id)
-        ->first();
-
-    if (!$existing) {
-        return response()->json(['message' => 'لا يوجد حجز لهذه الشقة'], 404);
-    }
-
-    $user->bookings()->detach($request->property_id);
-
-    return response()->json(['
-        message' => 'تم إلغاء الحجز بنجاح'
-    ], 200);
-}
-
 
     public function rateProperty(Request $request){
         $request->validate([
@@ -285,7 +314,7 @@ public function cancelReservation(Request $request)
         $user = auth()->user();
         if ($user->verified_status!='approved'){
             return response()->json([
-                'message'=>'Your Accout has not yet been Approved'
+                'message'=>'Your Account has not yet been Approved'
                 ],403);
         }
         $reservation = DB::table('property_user')
@@ -313,27 +342,35 @@ public function cancelReservation(Request $request)
         return response()->json(['message' => 'تم تسجيل تقييمك الأخير بنجاح']);
     }
 
-    public function getMyReservation(){
-    $user = auth()->user();
+    public function getMyReservation()
+    {
+        $user = auth()->user();
 
-    if ($user->verified_status !== 'approved') {
+        if ($user->verified_status !== 'approved') {
+            return response()->json([
+                'message' => 'Your Account has not yet been Approved'
+            ], 403);
+        }
+
+        $bookings = $user->bookings()
+            ->with('property')
+            ->get()
+            ->map(function ($booking) {
+
+                return [
+                    'property_user_id' => $booking->id,
+                    'property_id' => $booking->property_id,
+                    'details' => $booking->property->details,
+                    'status' => $booking->status,
+                    'start_date' => $booking->start_date,
+                    'end_date' => $booking->end_date,
+                    'type' => $booking->type,
+                ];
+            });
+
         return response()->json([
-            'message' => 'Your Account has not yet been Approved'
-        ], 403);
+            'message' => 'Here are all your reservations',
+            'bookings' => $bookings
+        ], 200);
     }
-
-    $bookings = $user->bookings()->with('property')->get()->map(function ($property) {
-        return [
-            'property_id'=> $property->id,
-            'details'=> $property->details,
-            'status'=> $property->pivot->status,
-        ];
-    });
-
-    return response()->json([
-        'message'  => 'Here are all your reservations',
-        'bookings' => $bookings
-    ], 200);
-}
-
 }

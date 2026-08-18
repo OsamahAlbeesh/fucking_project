@@ -187,7 +187,7 @@ public function respondToReservation(Request $request){
 
         return response()->json([
             'success' => true,
-            'message' => 'تم قبول الطلب بنجاح، وتحويل حالته إلى (بانتظار الدفع)، وتم إشعار المستأجر لإتمام العملية.'
+            'message' => 'تم قبول الطلب بنجاح، وتحويل حالته إلى (بانتظار الدفع)، وتم إشعار الزبون لإتمام العملية.'
         ], 200);
     }
 
@@ -199,7 +199,7 @@ public function respondToReservation(Request $request){
 
     return response()->json([
         'success' => true,
-        'message' => 'تم رفض طلب الحجز بنجاح، وتظل الشقة متاحة للآخرين.'
+        'message' => 'تم رفض طلب الحجز بنجاح.'
     ], 200);
 }
 
