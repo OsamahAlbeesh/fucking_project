@@ -35,7 +35,7 @@ Route::get('admin/reservations/ready-to-complete', [AdminController::class, 'get
     ->middleware('auth:sanctum', Admin::class);
 Route::post('admin/disputes/{disputeId}/resolve', [AdminController::class, 'resolveDispute'])
     ->middleware('auth:sanctum', Admin::class);
-Route::post('admin/payments/{transactionId}/refund-demo', [AdminController::class, 'refundDemoPayment'])
+Route::post('admin/payments/{transactionId}/refund-demo', [AdminController::class, 'refund  DemoPayment'])
     ->middleware('auth:sanctum', Admin::class);
 Route::post('admin/reservations/{bookingId}/complete', [AdminController::class, 'completeReservation'])
     ->middleware('auth:sanctum', Admin::class);

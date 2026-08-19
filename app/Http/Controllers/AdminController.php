@@ -111,6 +111,7 @@ class AdminController extends Controller
                 'landlord.id as landlord_id',
                 'landlord.first_name as landlord_first_name',
                 'landlord.last_name as landlord_last_name',
+                'landlord.phone as landlord_phone',
                 'resolver.id as resolved_by_id',
                 'resolver.first_name as resolved_by_first_name',
                 'resolver.last_name as resolved_by_last_name',
