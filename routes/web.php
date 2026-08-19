@@ -1,8 +1,11 @@
 <?php
 
-use App\Http\Controllers\ProfileController;
-use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\AdminController;
-
-Route::get('/dashboard',[AdminController::class,'dashboard']);
-Route::post('/dashboard/update',[AdminController::class,'updateStatus'])->name('admin.updateStatus');
+/*
+ |--------------------------------------------------------------------------
+ | Web Routes
+ |--------------------------------------------------------------------------
+ |
+ | لا توجد مسارات إدارية عبر الويب في هذا المشروع. جميع إجراءات الإدارة
+ | متاحة فقط عبر routes/api.php مع auth:sanctum ووسيط Admin.
+ |
+ */

@@ -21,12 +21,14 @@ class UserController extends Controller
             'id_photo_back'=>'required|image|mimes:jpg,png,jpeg|max:4096',
             'role'=>'required|in:customer,landlord',
             'birth_date'=>'required|date|before_or_equal:'.now()->subYears(18)->format('Y-m-d'),
-            'password'=>'required|min:8|string'
+            'password'=>'required|min:8|string',
+            ''
+
         ],
-        [
-        'birth_date.before_or_equal' => 'يجب أن يكون عمرك 18 سنة على الأقل.',
-        'birth_date.date' => 'يرجى إدخال تاريخ ميلاد صالح.',
-       ]);
+            [
+                'birth_date.before_or_equal' => 'يجب أن يكون عمرك 18 سنة على الأقل.',
+                'birth_date.date' => 'يرجى إدخال تاريخ ميلاد صالح.',
+            ]);
 
         $user = User::where('phone',$request->phone)->first();
 
@@ -40,26 +42,26 @@ class UserController extends Controller
             $personalPath = '/storage/' . $request->file('photo_url')->store('photos','public');
 
         if ($request->hasFile('id_photo_front'))
-        $personalIdPathFront = '/storage/' . $request->file('id_photo_front')->store('photos','public');
+            $personalIdPathFront = '/storage/' . $request->file('id_photo_front')->store('photos','public');
 
         if ($request->hasFile('id_photo_back'))
             $personalIdPathBack = '/storage/' . $request->file('id_photo_back')->store('photos','public');
 
-            $user = User::create([
+        $user = User::create([
             'phone'=>$request->phone,
             'password'=>Hash::make($request->password),
             'first_name'=>$request->first_name,
             'last_name'=>$request->last_name,
             'photo_url'=>$personalPath,
             'id_photo_front'=>$personalIdPathFront,
-                'id_photo_back'=>$personalIdPathBack,
-                'role'=>$request->role,
+            'id_photo_back'=>$personalIdPathBack,
+            'role'=>$request->role,
             'birth_date'=>$request->birth_date,
         ]);
 
         return response()->json([
             'message'=>'User Registered Successfully',
-             'User: '=>$user
+            'User: '=>$user
         ],201 );
     }
 

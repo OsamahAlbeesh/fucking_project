@@ -96,12 +96,17 @@ class CustomerController extends Controller
         'property_id' => 'required|exists:properties,id',
         'start_date' => 'required|date',
         'end_date' => 'required|date|after:start_date',
-        'type' => 'required|in:rent,buy' // تحديد هل الطلب إيجار أم شراء لشحن السعر المناسب في Stripe
+        'type' => 'required|in:rent,buy' // تحديد هل الطلب إيجار أم شراء لحساب عربون الحجز المناسب
     ]);
 
     $user = auth()->user();
-    $property = Property::findOrFail($request->property_id);
-
+        $property = Property::findOrFail($request->property_id);
+    if ((int) $property->user_id === (int) $user->id) {
+        return response()->json([
+            'success' => false,
+            'message' => 'لا يمكنك إنشاء حجز لعقار تملكه أنت.',
+        ], 403);
+    }
     // 2. التحقق من توثيق حساب المستأجر
     if ($user->verified_status != 'approved'){
         return response()->json([
@@ -122,9 +127,7 @@ class CustomerController extends Controller
         ], 410);
     }
 
-    /* ملاحظة: تم حذف شرط ($user->balance < $property->rent_price)
-       لأن الدفع أصبح خارجياً ومباشراً عبر بطاقات الائتمان (Stripe)
-    */
+    /* لا نتحقق من كامل قيمة الإيجار هنا؛ الدفع التجريبي يتحقق من عربون الحجز فقط. */
 
     // 4. إنشاء طلب الحجز بحالة معلقة (Pending) بانتظار الدفع
     $booking = PropertyUser::create([
@@ -139,7 +142,7 @@ class CustomerController extends Controller
     return response()->json([
         'success' => true,
         'message' => 'تم تسجيل طلب الحجز بنجاح، يرجى الانتقال لتوليد رابط الدفع لإتمام المعاملة المالية',
-        'property_user_id' => $booking->id ,// هذا المعرّف مهم جداً للفرونت إند ليستدعي به الـ Stripe Controller
+        'property_user_id' => $booking->id, // يستعمله العميل لاحقاً لاستدعاء الدفع التجريبي
         'user'=>$user
     ], 201);
 }
@@ -150,8 +153,13 @@ class CustomerController extends Controller
     ]);
 
     $user = auth()->user();
-    $property = Property::findOrFail($request->property_id);
-
+        $property = Property::findOrFail($request->property_id);
+    if ((int) $property->user_id === (int) $user->id) {
+        return response()->json([
+            'success' => false,
+            'message' => 'لا يمكنك إنشاء طلب شراء لعقار تملكه أنت.',
+        ], 403);
+    }
     if ($user->verified_status != 'approved') {
         return response()->json(['message' => 'Your Account has not yet been Approved'], 403);
     }
@@ -162,11 +170,7 @@ class CustomerController extends Controller
         ->where('status', 'Sold')
         ->exists();
 
-    if ($user->balance < $property->price) {
-        return response()->json([
-            'message' => 'رصيدك الحالي (' . $user->balance . ') غير كافٍ لشراء هذه الشقة بسعر (' . $property->price . ')'
-        ], 400);
-    }
+    // لا نتحقق من السعر الكامل هنا؛ الرصيد المطلوب هو عربون الحجز فقط ويُحسب عند الدفع التجريبي.
 
     if ($isSold) {
         return response()->json(['message' => 'عذراً، هذه الشقة تم بيعها مسبقاً وليست متاحة للعرض'], 410);
@@ -275,32 +279,53 @@ class CustomerController extends Controller
     {
         $request->validate([
             'property_user_id' => 'required|exists:property_user,id',
+            'reason' => 'nullable|string|max:1000',
         ]);
 
         $user = auth()->user();
 
         if ($user->verified_status != 'approved') {
             return response()->json([
+                'success' => false,
                 'message' => 'Your Account has not yet been Approved'
             ], 403);
         }
 
-        // البحث عن الحجز الخاص بهذا المستخدم
         $existing = PropertyUser::where('id', $request->property_user_id)
             ->where('user_id', $user->id)
             ->first();
 
         if (!$existing) {
             return response()->json([
+                'success' => false,
                 'message' => 'لا يوجد هذا الحجز للمستخدم الحالي'
             ], 404);
         }
 
-        // حذف الحجز
-        $existing->delete();
+        if (!in_array($existing->status, ['Pending', 'Awaiting_Payment'], true)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'لا يمكن إلغاء هذا الحجز بعد دفع العربون. استخدم طلب الاسترداد أو النزاع عند الحاجة.',
+            ], 409);
+        }
+
+        // لا نحذف السجل؛ نستعمل الحالة القديمة Rejected كإلغاء متوافق مع المخطط الحالي.
+        $fromStatus = $existing->status;
+        $existing->update(['status' => 'Rejected']);
+
+        DB::table('reservation_events')->insert([
+            'property_user_id' => $existing->id,
+            'actor_id' => $user->id,
+            'event_type' => 'reservation_cancelled_by_customer',
+            'from_status' => $fromStatus,
+            'to_status' => 'Rejected',
+            'metadata' => json_encode(['reason' => $request->reason], JSON_UNESCAPED_UNICODE),
+            'created_at' => now(),
+        ]);
 
         return response()->json([
-            'message' => 'تم إلغاء الحجز بنجاح'
+            'success' => true,
+            'message' => 'تم إلغاء الحجز مع الاحتفاظ بسجله للتدقيق.'
         ], 200);
     }
 

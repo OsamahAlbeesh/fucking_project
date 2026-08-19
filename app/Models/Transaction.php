@@ -11,19 +11,17 @@ class Transaction extends Model
         'property_id',
         'property_user_id',
         'payment_method',
-        'stripe_payment_id',
         'amount',
         'commission',
         'type',
         'status',
         'contract_pdf',
-        'stripe_session_id',
         'payment_details',
     ];
     protected function amount(): \Illuminate\Database\Eloquent\Casts\Attribute{
         return \Illuminate\Database\Eloquent\Casts\Attribute::make(
             get: fn ($value) => $value / 100, // للعرض بالدولار/الليرة
-            set: fn ($value) => $value * 100, // للتخزين كـ Integer متوافق مع Stripe
+            set: fn ($value) => $value * 100, // للتخزين كعدد صحيح بوحدة المشروع
         );
     }
 
