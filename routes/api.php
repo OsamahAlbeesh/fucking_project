@@ -29,6 +29,10 @@ Route::get('getUsers',[UserController::class,'getUsers'])
 Route::post('verifyUser', [AdminController::class, 'verifyUser'])
     ->middleware('auth:sanctum', Admin::class)
     ->name('admin.verifyUser');
+Route::get('admin/disputes', [AdminController::class, 'getDisputes'])
+    ->middleware('auth:sanctum', Admin::class);
+Route::get('admin/reservations/ready-to-complete', [AdminController::class, 'getReservationsReadyToComplete'])
+    ->middleware('auth:sanctum', Admin::class);
 Route::post('admin/disputes/{disputeId}/resolve', [AdminController::class, 'resolveDispute'])
     ->middleware('auth:sanctum', Admin::class);
 Route::post('admin/payments/{transactionId}/refund-demo', [AdminController::class, 'refundDemoPayment'])

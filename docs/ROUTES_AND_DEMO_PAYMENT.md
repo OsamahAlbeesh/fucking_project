@@ -100,6 +100,8 @@
 
 | الطريقة | المسار | ماذا يفعل |
 |---|---|---|
+| `GET` | `/api/admin/disputes` | يعرض النزاعات مع الحجز والعقار والعميل والمالك وبيانات الدفعة. يدعم `?status=open` أو أي حالة نزاع صحيحة للترشيح. |
+| `GET` | `/api/admin/reservations/ready-to-complete` | يعرض فقط الحجوزات ذات `Accepted` ودفعة demo بحالة `paid_simulated` وعقار `available` ومن دون نزاع `open` أو `under_review`. |
 | `POST` | `/api/admin/disputes/{disputeId}/resolve` | يضع النزاع تحت المراجعة أو يحله لصالح أحد الطرفين. الحل لصالح المالك يعيد الدفعة المجمدة إلى `paid_simulated`؛ الحل لصالح العميل لا ينفذ استرداداً تلقائياً.
 | `POST` | `/api/admin/payments/{transactionId}/refund-demo` | يعكس العربون بعد طلب استرداد أو تجميد: يخصم من المالك ويعيده إلى العميل، ويجعل الحجز `Rejected`.
 | `POST` | `/api/admin/reservations/{bookingId}/complete` | يكمل الحجز بعد التحقق من وجود دفعة demo صحيحة وعدم وجود نزاع مفتوح. عند شراء فقط يغيّر العقار إلى `sold`؛ وعند الإيجار يغيّره إلى `rented`.
