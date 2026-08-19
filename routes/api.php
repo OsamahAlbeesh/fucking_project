@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\PropertyReportController;
 use App\Http\Controllers\FavoriteController;
 use App\Http\Controllers\AdminController;
 use App\Http\Controllers\PropertyController;
@@ -73,3 +74,17 @@ Route::middleware(['auth:sanctum', Landlord::class])->group(function () {
         Route::post('customer/rateProperty',[CustomerController::class,'rateProperty'])->middleware('auth:sanctum');
         Route::get('customer/myReservation',[CustomerController::class,'getMyReservation']);
 });
+// يستطيع أي مستخدم مصادق عليه فقط إنشاء بلاغ.
+Route::post('reports', [PropertyReportController::class, 'store'])
+    ->middleware(['auth:sanctum', 'throttle:10,1'])
+    ->name('reports.store');
+
+// المدير فقط يستطيع رؤية البلاغات.
+Route::get('admin/reports', [PropertyReportController::class, 'index'])
+    ->middleware('auth:sanctum', Admin::class)
+    ->name('admin.reports.index');
+
+// المدير فقط يستطيع تعديل حالة البلاغ وملاحظته.
+Route::put('admin/reports/{report}/status', [PropertyReportController::class, 'updateStatus'])
+    ->middleware('auth:sanctum', Admin::class)
+    ->name('admin.reports.update-status');

@@ -149,7 +149,7 @@ public function pendingReservations() {
 
 
 
-public function respondToReservation(Request $request){
+public function     respondToReservation(Request $request){
     $request->validate([
         'id' => 'required|exists:property_user,id',
         'status' => 'required|in:Accepted,Rejected',
