@@ -19,7 +19,17 @@ class LandlordController extends Controller
             'price' => 'required_without:rent_price|numeric|min:0',
             'rent_price' => 'required_without:price|numeric|min:0',
             'location' => 'required:string',
+            'latitude' => [
+                'nullable',
+                'numeric',
+                'between:-90,90',
+            ],
 
+            'longitude' => [
+                'nullable',
+                'numeric',
+                'between:-180,180',
+            ],
             'details'=>'required|string',
             'city_id'=>'required|exists:cities,id',
             'category'=>'required|in:flat,villa,land,shop,office',
@@ -30,7 +40,7 @@ class LandlordController extends Controller
        $user_id = Auth::user()->id;
        if (Auth::user()->verified_status!='approved'){
         return response()->json([
-            'message'=>'Your Accout has not yet been Approved'
+            'message'=>'Your Account has not yet been Approved'
             ]);
         }
     $propertyPath='';
@@ -47,6 +57,8 @@ class LandlordController extends Controller
             'property_image'=>$propertyPath,
             'user_id'=>$user_id,
             'location'=>$request->location,
+            'latitude'=>$request->latitude,
+            'longitude'=>$request->longitude,
             'category'=>$request->category
         ]);
 
@@ -63,7 +75,7 @@ class LandlordController extends Controller
           $property = Property::find($id);
         if (Auth::user()->verified_status!='approved'){
         return response()->json([
-            'message'=>'Your Accout has not yet been Approved'
+            'message'=>'Your Account has not yet been Approved'
             ]);
         }
         if (Auth::user()->id !== $property->user_id) {
@@ -81,8 +93,18 @@ class LandlordController extends Controller
             'user_id' => 'exists:users,id',
             'governorate_id' => 'nullable|exists:governorates,id',
             'city_id' => 'nullable|exists:cities,id',
-            'location' => 'required:string',
+            'location' => 'nullable:string',
+            'latitude' => [
+                'nullable',
+                'numeric',
+                'between:-90,90',
+            ],
 
+            'longitude' => [
+                'nullable',
+                'numeric',
+                'between:-180,180',
+            ],
             'details' => 'nullable|string|min:10|max:1000',
             'price' => 'nullable|integer|min:10000',
             'rent_price' => 'nullable|integer|min:100',
@@ -108,6 +130,8 @@ class LandlordController extends Controller
         $property->details =$validated['details'] ?? $property->details;
         $property->price =$validated['price'] ?? $property->price;
         $property->location =$validated['location'] ?? $property->location;
+        $property->longitude =$validated['longitude'] ?? $property->longitude;
+        $property->latitude =$validated['latitude'] ?? $property->latitude;
         $property->rent_price =$validated['rent_price'] ?? $property->rent_price;
         $property->property_image =$validated['property_image'] ?? $property->property_image;
         $property->category =$validated['category'] ?? $property->category;

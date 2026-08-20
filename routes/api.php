@@ -14,6 +14,7 @@ use App\Http\Middleware\Customer;
 use App\Http\Middleware\Landlord;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\AuthOtpController;
 
 // Routs for Authintications
 Route::post('register',[UserController::class,'register']);
@@ -102,3 +103,20 @@ Route::get('admin/reports', [PropertyReportController::class, 'index'])
 Route::put('admin/reports/{report}/status', [PropertyReportController::class, 'updateStatus'])
     ->middleware('auth:sanctum', Admin::class)
     ->name('admin.reports.update-status');
+
+// OTP + Password Reset
+
+Route::post('send-register-otp',
+    [AuthOtpController::class, 'sendRegisterOtp']);
+
+Route::post('verify-register-otp',
+    [AuthOtpController::class, 'verifyRegisterOtp']);
+
+Route::post('forgot-password',
+    [AuthOtpController::class, 'forgotPassword']);
+
+Route::post('verify-reset-otp',
+    [AuthOtpController::class, 'verifyResetOtp']);
+
+Route::post('reset-password',
+    [AuthOtpController::class, 'resetPassword']);

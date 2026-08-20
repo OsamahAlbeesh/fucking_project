@@ -16,6 +16,7 @@ class UserFactory extends Factory
             'first_name' => fake()->firstName(),
             'last_name' => fake()->lastName(),
             'phone' => '09' . fake()->unique()->numerify('########'),
+            'email' =>fake()->unique()->email().'@gmail.com' ,
             'photo_url' => 'storage/photos/random.jpg',
             'id_photo_front' => 'storage/photos/random.jpg',
             'id_photo_back' => 'storage/photos/random.jpg',

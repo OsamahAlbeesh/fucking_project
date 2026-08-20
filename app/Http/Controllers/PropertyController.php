@@ -54,7 +54,7 @@ class PropertyController extends Controller
             'details' => $property->details,
             'city_id' => $property->city_id,
             'governorate_id' => $property->governorate_id,
-            'property_image' => $property->flat_image,
+            'property_image' => $property->property_image,
             'owner_name' => $property->owner->first_name,
             'owner_id' => $property->user_id,
             'average_rating' => round($averageRating, 2), // التقييم النهائي
@@ -76,7 +76,7 @@ class PropertyController extends Controller
                 'details' => $property->details,
                 'city_id' => $property->city_id,
                 'governorate_id' => $property->governorate_id,
-                'property_image' => $property->flat_image,
+                'property_image' => $property->property_image,
                 'owner_id' => $property->user_id,
                 'average_rating' => round($property->reviews()->avg('rating'), 2),
                 'reviews_count' => $property->reviews()->count(),
