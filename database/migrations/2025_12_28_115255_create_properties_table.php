@@ -19,8 +19,8 @@ return new  class extends Migration
             $table->enum('category', ['flat', 'villa', 'land', 'shop', 'office'])->default('land');
             $table->text('details');
             $table->string('location');
-            $table->decimal('latitude', 10, 7);
-            $table->decimal('longitude', 10, 7);
+            $table->decimal('latitude', 10, 7)->nullable();
+            $table->decimal('longitude', 10, 7)->nullable();
             $table->bigInteger('price')->nullable();
             $table->bigInteger('rent_price')->nullable();
             $table->enum('status', ['available', 'rented', 'sold'])->default('available');

@@ -51,6 +51,8 @@ Route::get('/properties', [PropertyController::class, 'getAllProperties'])
 Route::get('/property/{id}', [PropertyController::class, 'getPropertyDetails'])
     ->middleware('auth:sanctum');
 Route::post('filter', [PropertyController::class, 'search']);
+Route::get('/getPropertyRatingById/{propertyId}', [PropertyController::class, 'getPropertyRating']);
+
 
 
 Route::post('customer/fav/{property}', [FavoriteController::class, 'toggleFavoriteAlt'])
