@@ -102,3 +102,4 @@ Route::get('admin/reports', [PropertyReportController::class, 'index'])
 Route::put('admin/reports/{report}/status', [PropertyReportController::class, 'updateStatus'])
     ->middleware('auth:sanctum', Admin::class)
     ->name('admin.reports.update-status');
+ ////-----------------------------------------------------------------
