@@ -9,12 +9,12 @@ use App\Http\Controllers\LandlordController;
 use App\Http\Controllers\DemoPaymentController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\UserController;
-use App\Http\Controllers\AuthOtpController;
 use App\Http\Middleware\Admin;
 use App\Http\Middleware\Customer;
 use App\Http\Middleware\Landlord;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\AuthOtpController;
 
 // Routs for Authintications
 Route::post('register',[UserController::class,'register']);
@@ -50,8 +50,9 @@ Route::get('/properties', [PropertyController::class, 'getAllProperties'])
     ->middleware('auth:sanctum');
 Route::get('/property/{id}', [PropertyController::class, 'getPropertyDetails'])
     ->middleware('auth:sanctum');
-Route::get('/getPropertyRatingById/{id}', [PropertyController::class, 'getPropertyRating']);
 Route::post('filter', [PropertyController::class, 'search']);
+Route::get('/getPropertyRatingById/{id}', [PropertyController::class, 'getPropertyRating']);
+
 
 
 Route::post('customer/fav/{property}', [FavoriteController::class, 'toggleFavoriteAlt'])
@@ -105,14 +106,19 @@ Route::put('admin/reports/{report}/status', [PropertyReportController::class, 'u
     ->middleware('auth:sanctum', Admin::class)
     ->name('admin.reports.update-status');
 
-// شحن رصيد المستخدم: يبقى متاحاً كوظيفة إدارية فقط.
-Route::post('admin/{user_id}/addBalance', [AdminController::class, 'addBalance'])
-    ->middleware('auth:sanctum', Admin::class)
-    ->name('admin.add-balance');
-
 // OTP + Password Reset
-Route::post('send-register-otp', [AuthOtpController::class, 'sendRegisterOtp']);
-Route::post('verify-register-otp', [AuthOtpController::class, 'verifyRegisterOtp']);
-Route::post('forgot-password', [AuthOtpController::class, 'forgotPassword']);
-Route::post('verify-reset-otp', [AuthOtpController::class, 'verifyResetOtp']);
-Route::post('reset-password', [AuthOtpController::class, 'resetPassword']);
+
+Route::post('send-register-otp',
+    [AuthOtpController::class, 'sendRegisterOtp']);
+
+Route::post('verify-register-otp',
+    [AuthOtpController::class, 'verifyRegisterOtp']);
+
+Route::post('forgot-password',
+    [AuthOtpController::class, 'forgotPassword']);
+
+Route::post('verify-reset-otp',
+    [AuthOtpController::class, 'verifyResetOtp']);
+
+Route::post('reset-password',
+    [AuthOtpController::class, 'resetPassword']);

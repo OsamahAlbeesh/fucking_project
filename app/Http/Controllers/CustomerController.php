@@ -114,20 +114,16 @@ class CustomerController extends Controller
             ], 403);
         }
 
-        // 3. تمنع أي عملية شراء قيد الدفع أو مدفوع عربونها أو مكتملة حجوزاتٍ متعارضة.
-        $hasActivePurchase = DB::table('property_user')
+        // 3. التحقق من أن الشقة لم يتم بيعها مسبقاً لشخص آخر
+        $isSold = DB::table('property_user')
             ->where('property_id', $request->property_id)
             ->where('type', 'buy')
-            ->whereIn('status', [
-                'Awaiting_Payment',
-                'Accepted',
-                'Sold',
-            ])
+            ->where('status', 'Sold')
             ->exists();
 
-        if ($hasActivePurchase){
+        if ($isSold){
             return response()->json([
-                'message' => 'لا يمكن حجز هذا العقار لأن طلب شرائه قيد الدفع أو الإتمام أو تم بيعه بالفعل.',
+                'message' => 'لا يُمكنك حجز هذه الشقة لقد تمَّ بيعها بالفعل ...',
             ], 410);
         }
 
@@ -168,20 +164,16 @@ class CustomerController extends Controller
             return response()->json(['message' => 'Your Account has not yet been Approved'], 403);
         }
 
-        $hasActivePurchase = DB::table('property_user')
+        $isSold = DB::table('property_user')
             ->where('property_id', $request->property_id)
             ->where('type', 'buy')
-            ->whereIn('status', [
-                'Awaiting_Payment',
-                'Accepted',
-                'Sold',
-            ])
+            ->where('status', 'Sold')
             ->exists();
 
         // لا نتحقق من السعر الكامل هنا؛ الرصيد المطلوب هو عربون الحجز فقط ويُحسب عند الدفع التجريبي.
 
-        if ($hasActivePurchase) {
-            return response()->json(['message' => 'عذراً، هذا العقار غير متاح لأن طلب شرائه قيد الدفع أو الإتمام أو تم بيعه بالفعل.'], 410);
+        if ($isSold) {
+            return response()->json(['message' => 'عذراً، هذه الشقة تم بيعها مسبقاً وليست متاحة للعرض'], 410);
         }
 
         $hasPendingOrder = DB::table('property_user')

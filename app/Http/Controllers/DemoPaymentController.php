@@ -100,8 +100,6 @@ class DemoPaymentController extends Controller
                 ]);
                 DB::table('users')->where('id', $customer->id)->decrement('balance', $depositAmount);
                 DB::table('users')->where('id', $landlord->id)->increment('balance', $depositAmount);
-                // حالة «Accepted» تعني أن العربون دُفع وأن المعاملة بانتظار إتمام الإدارة.
-                // تحديث حالة العقار إلى sold أو rented مؤجل إلى completeReservation.
                 DB::table('property_user')->where('id', $booking->id)->update([
                     'status' => 'Accepted',
                     'updated_at' => $now,
