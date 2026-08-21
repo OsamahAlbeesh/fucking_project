@@ -14,6 +14,7 @@ use App\Http\Middleware\Customer;
 use App\Http\Middleware\Landlord;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\AuthOtpController;
 
 // Routs for Authintications
 Route::post('register',[UserController::class,'register']);
@@ -36,7 +37,7 @@ Route::get('admin/reservations/ready-to-complete', [AdminController::class, 'get
     ->middleware('auth:sanctum', Admin::class);
 Route::post('admin/disputes/{disputeId}/resolve', [AdminController::class, 'resolveDispute'])
     ->middleware('auth:sanctum', Admin::class);
-Route::post('admin/payments/{transactionId}/refund-demo', [AdminController::class, 'refund  DemoPayment'])
+Route::post('admin/payments/{transactionId}/refund-demo', [AdminController::class, 'refundDemoPayment'])
     ->middleware('auth:sanctum', Admin::class);
 Route::post('admin/reservations/{bookingId}/complete', [AdminController::class, 'completeReservation'])
     ->middleware('auth:sanctum', Admin::class);
@@ -50,6 +51,8 @@ Route::get('/properties', [PropertyController::class, 'getAllProperties'])
 Route::get('/property/{id}', [PropertyController::class, 'getPropertyDetails'])
     ->middleware('auth:sanctum');
 Route::post('filter', [PropertyController::class, 'search']);
+Route::get('/getPropertyRatingById/{id}', [PropertyController::class, 'getPropertyRating']);
+
 
 
 Route::post('customer/fav/{property}', [FavoriteController::class, 'toggleFavoriteAlt'])
@@ -65,28 +68,28 @@ Route::middleware('auth:sanctum')->get('/me', function (Request $request) {
 
 
 Route::middleware(['auth:sanctum', Landlord::class])->group(function () {
-        Route::post('landlord/addproperty',[LandlordController::class,'addProperty']);
-        Route::delete('landlord/removeproperty',[LandlordController::class,'removeProperty']);
-        Route::post('landlord/{property_id}/updateproperty',[LandlordController::class,'updatePropertyDetails']);
-        Route::get('landlord/getproperties',[LandlordController::class,'getProperties']);
-        Route::get('landlord/getPendingRents',[LandlordController::class,'pendingReservations']);
-        Route::put('landlord/responsToRequsets',[LandlordController::class,'respondToReservation']);
-        Route::get('landlord/getAllReservations',[LandlordController::class,'getAllReservations']);
-    });
+    Route::post('landlord/addproperty',[LandlordController::class,'addProperty']);
+    Route::delete('landlord/removeproperty',[LandlordController::class,'removeProperty']);
+    Route::post('landlord/{property_id}/updateproperty',[LandlordController::class,'updatePropertyDetails']);
+    Route::get('landlord/getproperties',[LandlordController::class,'getProperties']);
+    Route::get('landlord/getPendingRents',[LandlordController::class,'pendingReservations']);
+    Route::put('landlord/responsToRequsets',[LandlordController::class,'respondToReservation']);
+    Route::get('landlord/getAllReservations',[LandlordController::class,'getAllReservations']);
+});
 
-    Route::middleware(['auth:sanctum',Customer::class])->group(function (){
-        Route::post('customer/buy',[CustomerController::class,'buyProperty'])->middleware('auth:sanctum');
-        Route::post('customer/rent',[CustomerController::class,'reserveProperty'])->middleware('auth:sanctum');
-        // المبلغ يُحسب في الخادم ويُنقل من رصيد العميل إلى رصيد المالك بمحاكاة demo.
-        Route::get('customer/reservations/{bookingId}/payment', [DemoPaymentController::class, 'getPaymentDocument']);
-        Route::post('customer/payment/demo', [DemoPaymentController::class, 'payReservationDeposit']);
-        Route::post('customer/payments/{transactionId}/request-refund', [DemoPaymentController::class, 'requestRefund']);
-        Route::post('customer/reservations/{bookingId}/dispute', [DemoPaymentController::class, 'openDispute']);
-        Route::put('customer/rent/{property_id}',[CustomerController::class,'updateReservation'])->middleware('auth:sanctum');
-        // يُستعمل POST للحفاظ على سجل الحجز بدلاً من حذفه.
-        Route::post('customer/reservations/cancel',[CustomerController::class,'cancelReservation']);
-        Route::post('customer/rateProperty',[CustomerController::class,'rateProperty'])->middleware('auth:sanctum');
-        Route::get('customer/myReservation',[CustomerController::class,'getMyReservation']);
+Route::middleware(['auth:sanctum',Customer::class])->group(function (){
+    Route::post('customer/buy',[CustomerController::class,'buyProperty'])->middleware('auth:sanctum');
+    Route::post('customer/rent',[CustomerController::class,'reserveProperty'])->middleware('auth:sanctum');
+    // المبلغ يُحسب في الخادم ويُنقل من رصيد العميل إلى رصيد المالك بمحاكاة demo.
+    Route::get('customer/reservations/{bookingId}/payment', [DemoPaymentController::class, 'getPaymentDocument']);
+    Route::post('customer/payment/demo', [DemoPaymentController::class, 'payReservationDeposit']);
+    Route::post('customer/payments/{transactionId}/request-refund', [DemoPaymentController::class, 'requestRefund']);
+    Route::post('customer/reservations/{bookingId}/dispute', [DemoPaymentController::class, 'openDispute']);
+    Route::put('customer/rent/{property_id}',[CustomerController::class,'updateReservation'])->middleware('auth:sanctum');
+    // يُستعمل POST للحفاظ على سجل الحجز بدلاً من حذفه.
+    Route::post('customer/reservations/cancel',[CustomerController::class,'cancelReservation']);
+    Route::post('customer/rateProperty',[CustomerController::class,'rateProperty'])->middleware('auth:sanctum');
+    Route::get('customer/myReservation',[CustomerController::class,'getMyReservation']);
 });
 // يستطيع أي مستخدم مصادق عليه فقط إنشاء بلاغ.
 Route::post('reports', [PropertyReportController::class, 'store'])
@@ -102,4 +105,22 @@ Route::get('admin/reports', [PropertyReportController::class, 'index'])
 Route::put('admin/reports/{report}/status', [PropertyReportController::class, 'updateStatus'])
     ->middleware('auth:sanctum', Admin::class)
     ->name('admin.reports.update-status');
- ////-----------------------------------------------------------------
+
+// OTP + Password Reset
+
+Route::post('send-register-otp',
+    [AuthOtpController::class, 'sendRegisterOtp']);
+
+Route::post('verify-register-otp',
+    [AuthOtpController::class, 'verifyRegisterOtp']);
+
+Route::post('forgot-password',
+    [AuthOtpController::class, 'forgotPassword']);
+
+Route::post('verify-reset-otp',
+    [AuthOtpController::class, 'verifyResetOtp']);
+
+Route::post('reset-password',
+    [AuthOtpController::class, 'resetPassword']);
+
+Route::post('admin/{user_id}/addBalance',[AdminController::class, 'addBalance']);

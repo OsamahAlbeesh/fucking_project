@@ -101,9 +101,20 @@ class DemoPaymentController extends Controller
                 DB::table('users')->where('id', $customer->id)->decrement('balance', $depositAmount);
                 DB::table('users')->where('id', $landlord->id)->increment('balance', $depositAmount);
                 DB::table('property_user')->where('id', $booking->id)->update([
-                    'status' => 'Accepted',
+                    'status' => 'Sold',
                     'updated_at' => $now,
                 ]);
+
+                $propertyStatus = $booking->type === 'buy'
+                    ? 'sold'
+                    : 'rented';
+
+                DB::table('properties')
+                    ->where('id', $booking->property_id)
+                    ->update([
+                        'status' => $propertyStatus,
+                        'updated_at' => now(),
+                    ]);
 
                 $this->recordReservationEvent($booking->id, $customer->id, 'demo_deposit_paid', 'Awaiting_Payment', 'Accepted', [
                     'transaction_id' => $transaction->id,

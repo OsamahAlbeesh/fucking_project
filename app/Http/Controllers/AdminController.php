@@ -365,4 +365,26 @@ class AdminController extends Controller
         });
     }
 
+    public function addBalance(Request $request, $userid)
+    {
+        $validated = $request->validate([
+            'amount' => 'required|numeric|min:0',
+        ]);
+
+        $user =User::where('id', $userid)->first();
+        if (!$user) {
+            return response()->json(['message'=>'user not found'], 404);
+        }
+
+        $user->balance = $user->balance + $validated['amount'];
+
+        $user->save();
+
+        return response()->json([
+            'message'=>'balance added successfully',
+            'new_balance' => $user->balance,
+        ], 200);
+
+    }
+
 }

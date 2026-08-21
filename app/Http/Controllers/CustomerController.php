@@ -91,115 +91,118 @@ class CustomerController extends Controller
     // }
 
     public function reserveProperty(Request $request){
-    // 1. التحقق من البيانات القادمة من الفرونت إند
-    $request->validate([
-        'property_id' => 'required|exists:properties,id',
-        'start_date' => 'required|date',
-        'end_date' => 'required|date|after:start_date',
-        'type' => 'required|in:rent,buy' // تحديد هل الطلب إيجار أم شراء لحساب عربون الحجز المناسب
-    ]);
+        // 1. التحقق من البيانات القادمة من الفرونت إند
+        $request->validate([
+            'property_id' => 'required|exists:properties,id',
+            'start_date' => 'required|date',
+            'end_date' => 'required|date|after:start_date',
+            'type' => 'required|in:rent,buy' // تحديد هل الطلب إيجار أم شراء لحساب عربون الحجز المناسب
+        ]);
 
-    $user = auth()->user();
+        $user = auth()->user();
         $property = Property::findOrFail($request->property_id);
-    if ((int) $property->user_id === (int) $user->id) {
+        if ((int) $property->user_id === (int) $user->id) {
+            return response()->json([
+                'success' => false,
+                'message' => 'لا يمكنك إنشاء حجز لعقار تملكه أنت.',
+            ], 403);
+        }
+        // 2. التحقق من توثيق حساب المستأجر
+        if ($user->verified_status != 'approved'){
+            return response()->json([
+                'message' => 'Your Account has not yet been Approved'
+            ], 403);
+        }
+
+        // 3. التحقق من أن الشقة لم يتم بيعها مسبقاً لشخص آخر
+        $isSold = DB::table('property_user')
+            ->where('property_id', $request->property_id)
+            ->where('type', 'buy')
+            ->whereIn('status', [
+                'Awaiting_Payment',
+                'Sold',
+            ])
+            ->exists();
+
+        if ($isSold){
+            return response()->json([
+                'message' => 'لا يُمكنك حجز هذه الشقة لقد تمَّ بيعها بالفعل او بانتظار الدفع من شخص ...',
+            ], 410);
+        }
+
+        /* لا نتحقق من كامل قيمة الإيجار هنا؛ الدفع التجريبي يتحقق من عربون الحجز فقط. */
+
+        // 4. إنشاء طلب الحجز بحالة معلقة (Pending) بانتظار الدفع
+        $booking = PropertyUser::create([
+            'user_id' => $user->id,
+            'property_id' => $property->id,
+            'start_date' => $request->start_date,
+            'end_date' => $request->end_date,
+            'type' => $request->type,
+            'status' => 'Pending'
+        ]);
+
         return response()->json([
-            'success' => false,
-            'message' => 'لا يمكنك إنشاء حجز لعقار تملكه أنت.',
-        ], 403);
+            'success' => true,
+            'message' => 'تم تسجيل طلب الحجز بنجاح، يرجى الانتقال لتوليد رابط الدفع لإتمام المعاملة المالية',
+            'property_user_id' => $booking->id, // يستعمله العميل لاحقاً لاستدعاء الدفع التجريبي
+            'user'=>$user
+        ], 201);
     }
-    // 2. التحقق من توثيق حساب المستأجر
-    if ($user->verified_status != 'approved'){
-        return response()->json([
-            'message' => 'Your Account has not yet been Approved'
-        ], 403);
-    }
-
-    // 3. التحقق من أن الشقة لم يتم بيعها مسبقاً لشخص آخر
-    $isSold = DB::table('property_user')
-        ->where('property_id', $request->property_id)
-        ->where('type', 'buy')
-        ->where('status', 'Sold')
-        ->exists();
-
-    if ($isSold){
-        return response()->json([
-            'message' => 'لا يُمكنك حجز هذه الشقة لقد تمَّ بيعها بالفعل ...',
-        ], 410);
-    }
-
-    /* لا نتحقق من كامل قيمة الإيجار هنا؛ الدفع التجريبي يتحقق من عربون الحجز فقط. */
-
-    // 4. إنشاء طلب الحجز بحالة معلقة (Pending) بانتظار الدفع
-    $booking = PropertyUser::create([
-        'user_id' => $user->id,
-        'property_id' => $property->id,
-        'start_date' => $request->start_date,
-        'end_date' => $request->end_date,
-        'type' => $request->type,
-        'status' => 'Pending'
-    ]);
-
-    return response()->json([
-        'success' => true,
-        'message' => 'تم تسجيل طلب الحجز بنجاح، يرجى الانتقال لتوليد رابط الدفع لإتمام المعاملة المالية',
-        'property_user_id' => $booking->id, // يستعمله العميل لاحقاً لاستدعاء الدفع التجريبي
-        'user'=>$user
-    ], 201);
-}
 
     public function buyProperty(Request $request) {
-    $request->validate([
-        'property_id' => 'required|exists:properties,id',
-    ]);
+        $request->validate([
+            'property_id' => 'required|exists:properties,id',
+        ]);
 
-    $user = auth()->user();
+        $user = auth()->user();
         $property = Property::findOrFail($request->property_id);
-    if ((int) $property->user_id === (int) $user->id) {
+        if ((int) $property->user_id === (int) $user->id) {
+            return response()->json([
+                'success' => false,
+                'message' => 'لا يمكنك إنشاء طلب شراء لعقار تملكه أنت.',
+            ], 403);
+        }
+        if ($user->verified_status != 'approved') {
+            return response()->json(['message' => 'Your Account has not yet been Approved'], 403);
+        }
+
+        $isSold = DB::table('property_user')
+            ->where('property_id', $request->property_id)
+            ->where('type', 'buy')
+            ->where('status', 'Sold')
+            ->exists();
+
+        // لا نتحقق من السعر الكامل هنا؛ الرصيد المطلوب هو عربون الحجز فقط ويُحسب عند الدفع التجريبي.
+
+        if ($isSold) {
+            return response()->json(['message' => 'عذراً، هذه الشقة تم بيعها مسبقاً وليست متاحة للعرض'], 410);
+        }
+
+        $hasPendingOrder = DB::table('property_user')
+            ->where('property_id', $request->property_id)
+            ->where('user_id', $user->id)
+            ->where('status', 'Pending')
+            ->where('type', 'buy')
+            ->exists();
+
+        if ($hasPendingOrder) {
+            return response()->json(['message' => 'لديك طلب شراء قيد الانتظار لهذه الشقة بالفعل'], 409);
+        }
+
+        PropertyUser::create([
+            'user_id'    => $user->id,
+            'property_id'    => $request->property_id,
+            'start_date' => now(),
+            'end_date'   => now(),
+            'status'     => 'Pending',
+            'type'       => 'buy',
+        ]);
+
         return response()->json([
-            'success' => false,
-            'message' => 'لا يمكنك إنشاء طلب شراء لعقار تملكه أنت.',
-        ], 403);
+            'message' => 'تم إرسال طلب الشراء بنجاح، بانتظار موافقة المالك لإتمام المعاملة المالية'
+        ], 201);
     }
-    if ($user->verified_status != 'approved') {
-        return response()->json(['message' => 'Your Account has not yet been Approved'], 403);
-    }
-
-    $isSold = DB::table('property_user')
-        ->where('property_id', $request->property_id)
-        ->where('type', 'buy')
-        ->where('status', 'Sold')
-        ->exists();
-
-    // لا نتحقق من السعر الكامل هنا؛ الرصيد المطلوب هو عربون الحجز فقط ويُحسب عند الدفع التجريبي.
-
-    if ($isSold) {
-        return response()->json(['message' => 'عذراً، هذه الشقة تم بيعها مسبقاً وليست متاحة للعرض'], 410);
-    }
-
-    $hasPendingOrder = DB::table('property_user')
-        ->where('property_id', $request->property_id)
-        ->where('user_id', $user->id)
-        ->where('status', 'Pending')
-        ->where('type', 'buy')
-        ->exists();
-
-    if ($hasPendingOrder) {
-        return response()->json(['message' => 'لديك طلب شراء قيد الانتظار لهذه الشقة بالفعل'], 409);
-    }
-
-   PropertyUser::create([
-        'user_id'    => $user->id,
-        'property_id'    => $request->property_id,
-        'start_date' => now(),
-        'end_date'   => now(),
-        'status'     => 'Pending',
-        'type'       => 'buy',
-    ]);
-
-    return response()->json([
-        'message' => 'تم إرسال طلب الشراء بنجاح، بانتظار موافقة المالك لإتمام المعاملة المالية'
-    ], 201);
-}
 
     public function updateReservation(Request $request, $property_id)
     {
@@ -340,7 +343,7 @@ class CustomerController extends Controller
         if ($user->verified_status!='approved'){
             return response()->json([
                 'message'=>'Your Account has not yet been Approved'
-                ],403);
+            ],403);
         }
         $reservation = DB::table('property_user')
             ->where('property_id', $request->property_id)
